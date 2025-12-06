@@ -8,10 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Pin package versions to avoid NU1604 warnings and ensure predictable restores -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
-    <!-- If you later want to use Generic Host, add Microsoft.Extensions.Hosting with an explicit version -->
-    <!-- <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" /> -->
   </ItemGroup>
 
   <ItemGroup>
