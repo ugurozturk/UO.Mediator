@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\mediatr_mineown.cqrs\mediatr_mineown.cqrs.csproj" />
+    <ProjectReference Include="..\Uozturk.Mediator.cqrs\Uozturk.Mediator.cqrs.csproj" />
   </ItemGroup>
 
   <ItemGroup>

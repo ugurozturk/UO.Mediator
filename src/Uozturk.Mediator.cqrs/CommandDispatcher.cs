@@ -6,7 +6,7 @@
 // using System.Threading.Tasks;
 // using Microsoft.Extensions.DependencyInjection;
 
-// namespace MyCompanyName.MyProjectName.Cqrs;
+// namespace Uozturk.Mediator.Cqrs;
 
 // internal static class HandlerInvoker
 // {

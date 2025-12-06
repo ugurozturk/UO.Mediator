@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MyCompanyName.MyProjectName.Cqrs;
+namespace Uozturk.Mediator.Cqrs;
 
 // Command interfaces
 public interface ICommand<TResult> { }

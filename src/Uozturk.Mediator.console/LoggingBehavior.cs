@@ -1,4 +1,4 @@
-using MyCompanyName.MyProjectName.Cqrs;
+using Uozturk.Mediator.Cqrs;
 
 public class LoggingBehavior<TInput> : IPipelineBehavior<TInput>
 {

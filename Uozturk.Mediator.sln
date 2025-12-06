@@ -5,9 +5,9 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mediatr_mineown.console", "src\mediatr_mineown.console\mediatr_mineown.console.csproj", "{D978E0E6-B09E-4A99-9D38-8D3F73CCA083}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Uozturk.Mediator.console", "src\Uozturk.Mediator.console\Uozturk.Mediator.console.csproj", "{D978E0E6-B09E-4A99-9D38-8D3F73CCA083}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mediatr_mineown.cqrs", "src\mediatr_mineown.cqrs\mediatr_mineown.cqrs.csproj", "{25F1E1E8-984C-4D8E-A4C6-B2B2AC323E21}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Uozturk.Mediator.cqrs", "src\Uozturk.Mediator.cqrs\Uozturk.Mediator.cqrs.csproj", "{25F1E1E8-984C-4D8E-A4C6-B2B2AC323E21}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

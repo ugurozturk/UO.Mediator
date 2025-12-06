@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace MyCompanyName.MyProjectName.Cqrs;
+namespace Uozturk.Mediator.Cqrs;
 
 public class Mediator : IMediator
 {

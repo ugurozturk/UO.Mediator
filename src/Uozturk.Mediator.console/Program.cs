@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
 using Volo.Abp;
-using MyCompanyName.MyProjectName.Cqrs;
+using Uozturk.Mediator.Cqrs;
 
 namespace MyCompanyName.MyProjectName;
 
@@ -47,7 +47,7 @@ public class Program
 
             // Automatically register handlers and pipeline behaviors for this mediator
             // Scan the current assembly (handlers are in the same assembly)
-            builder.Services.AddCustomMediatorDependencies(typeof(PingHandler).Assembly);
+            builder.Services.AddCustomMediatorDependencies(typeof(Program).Assembly);
 
             // Register core mediator service
             builder.Services.AddSingleton<IMediator, Mediator>();

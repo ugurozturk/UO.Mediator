@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MyCompanyName.MyProjectName.Cqrs;
+namespace Uozturk.Mediator.Cqrs;
 
 public interface IPipelineBehavior<in TInput>
 {
