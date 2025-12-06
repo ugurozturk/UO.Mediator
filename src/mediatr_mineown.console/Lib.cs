@@ -1,5 +1,7 @@
 // Command interfaces
-public interface ICommand<TResult> { }
+using Volo.Abp.DependencyInjection;
+
+public interface ICommand<TResult> : ITransientDependency { }
 
 public interface ICommandHandler<in TCommand, TResult> where TCommand : ICommand<TResult>
 {
@@ -7,14 +9,14 @@ public interface ICommandHandler<in TCommand, TResult> where TCommand : ICommand
 }
 
 // Query interfaces
-public interface IQuery<TResult> { }
+public interface IQuery<TResult> : ITransientDependency { }
 
 public interface IQueryHandler<in TQuery, TResult> where TQuery : IQuery<TResult>
 {
     Task<TResult> HandleAsync(TQuery query, CancellationToken cancellationToken = default);
 }
 
-public interface IMediator
+public interface IMediator : ITransientDependency
 {
     Task<TResult> SendCommandAsync<TResult>(ICommand<TResult> command, CancellationToken cancellationToken = default);
 

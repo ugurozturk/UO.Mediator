@@ -7,29 +7,24 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
-public interface ICommandDispatcher
+internal static class HandlerInvoker
 {
-    Task<object?> DispatchAsync(object command, CancellationToken cancellationToken = default);
-}
-
-    internal static class HandlerInvoker
+    public static async Task<object?> InvokeAsync<TCommand, TResult>(ICommandHandler<TCommand, TResult> handler, object command, CancellationToken cancellationToken)
+        where TCommand : ICommand<TResult>
     {
-        public static async Task<object?> InvokeAsync<TCommand, TResult>(ICommandHandler<TCommand, TResult> handler, object command, CancellationToken cancellationToken)
-            where TCommand : ICommand<TResult>
-        {
-            if (handler == null) throw new InvalidOperationException($"No handler registered for {typeof(TCommand).Name}");
-            var result = await handler.HandleAsync((TCommand)command!, cancellationToken);
-            return (object?)result;
-        }
-
-        public static async Task<object?> InvokeQueryAsync<TQuery, TResult>(IQueryHandler<TQuery, TResult> handler, object query, CancellationToken cancellationToken)
-            where TQuery : IQuery<TResult>
-        {
-            if (handler == null) throw new InvalidOperationException($"No handler registered for {typeof(TQuery).Name}");
-            var result = await handler.HandleAsync((TQuery)query!, cancellationToken);
-            return (object?)result;
-        }
+        if (handler == null) throw new InvalidOperationException($"No handler registered for {typeof(TCommand).Name}");
+        var result = await handler.HandleAsync((TCommand)command!, cancellationToken);
+        return (object?)result;
     }
+
+    public static async Task<object?> InvokeQueryAsync<TQuery, TResult>(IQueryHandler<TQuery, TResult> handler, object query, CancellationToken cancellationToken)
+        where TQuery : IQuery<TResult>
+    {
+        if (handler == null) throw new InvalidOperationException($"No handler registered for {typeof(TQuery).Name}");
+        var result = await handler.HandleAsync((TQuery)query!, cancellationToken);
+        return (object?)result;
+    }
+}
 
 public class CommandDispatcher : ICommandDispatcher
 {

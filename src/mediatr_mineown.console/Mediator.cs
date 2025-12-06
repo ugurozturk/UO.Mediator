@@ -4,8 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using Volo.Abp.DependencyInjection;
 
-public class Mediator : IMediator
+public class Mediator : IMediator, ITransientDependency
 {
     private readonly IServiceProvider _provider;
     private readonly ICommandDispatcher _dispatcher;

@@ -1,13 +1,14 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Volo.Abp.DependencyInjection;
 
 public class PingCommand : ICommand<string>
 {
     public required string Message { get; set; }
 }
 
-public class PingHandler : ICommandHandler<PingCommand, string>, ITransientDependency
+public class PingHandler : ICommandHandler<PingCommand, string>
 {
     public Task<string> HandleAsync(PingCommand command, CancellationToken cancellationToken = default)
     {
@@ -29,13 +30,3 @@ public class GetServerTimeHandler : IQueryHandler<GetServerTimeQuery, DateTime>,
     }
 }
 
-public class LoggingBehavior<TInput, TOutput> : IPipelineBehavior<TInput, TOutput>
-{
-    public async Task<TOutput> HandleAsync(TInput input, Func<Task<TOutput>> next, CancellationToken cancellationToken = default)
-    {
-        Console.WriteLine($"[LoggingBehavior] Handling {typeof(TInput).Name}");
-        var result = await next();
-        Console.WriteLine($"[LoggingBehavior] Handled {typeof(TInput).Name}");
-        return result;
-    }
-}
