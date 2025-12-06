@@ -4,6 +4,20 @@ using System.Threading.Tasks;
 using Volo.Abp.DependencyInjection;
 using MyCompanyName.MyProjectName.Cqrs;
 
+public class PingCommandNonMessage : ICommand
+{
+    public required string Message { get; set; }
+}
+
+public class PingCommandNonMessageHandler : ICommandHandler<PingCommandNonMessage>
+{
+    public Task HandleAsync(PingCommandNonMessage command, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine("PingCommandNonMessageHandler");
+        return Task.FromResult($"Pong: {command.Message}");
+    }
+}
+
 public class PingCommand : ICommand<string>
 {
     public required string Message { get; set; }

@@ -20,9 +20,10 @@ public class HelloWorldService : ITransientDependency
     public async Task SayHelloAsync()
     {
         Logger.LogInformation("Hello World!");
-        var result = await Mediator.SendCommandAsync(new PingCommand { Message = "Hello from HelloWorldService" });
+        await Mediator.SendCommandAsync(new PingCommandNonMessage { Message = "Hello from PingCommandNonMessage" });
+        var result = await Mediator.SendCommandAsync<PingCommand, string>(new PingCommand { Message = "Hello from PingCommand" });
         Console.WriteLine($"Mediator result: {result}");
-        var serverTime = await Mediator.SendQueryAsync(new GetServerTimeQuery());
+        var serverTime = await Mediator.SendQueryAsync<GetServerTimeQuery, DateTime>(new GetServerTimeQuery());
         Console.WriteLine($"Server time (UTC): {serverTime:O}");
     }
 }

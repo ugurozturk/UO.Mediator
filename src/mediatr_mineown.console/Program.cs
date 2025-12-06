@@ -43,13 +43,13 @@ public class Program
             await builder.Services.AddApplicationAsync<MyProjectNameModule>();
 
             builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+            builder.Services.AddTransient(typeof(IPipelineBehavior<>), typeof(LoggingBehavior<>));
 
             // Automatically register handlers and pipeline behaviors for this mediator
             // Scan the current assembly (handlers are in the same assembly)
             builder.Services.AddCustomMediatorDependencies(typeof(PingHandler).Assembly);
 
-            // Register core mediator services from the CQRS library
-            builder.Services.AddSingleton<ICommandDispatcher, CommandDispatcher>();
+            // Register core mediator service
             builder.Services.AddSingleton<IMediator, Mediator>();
 
             var host = builder.Build();

@@ -19,8 +19,10 @@ namespace MyCompanyName.MyProjectName.Cqrs
                 : assemblies;
 
             var commandHandlerOpen = typeof(ICommandHandler<,>);
+            var commandHandlerOpen2 = typeof(ICommandHandler<>);
             var queryHandlerOpen = typeof(IQueryHandler<,>);
             var pipelineBehaviorOpen = typeof(IPipelineBehavior<,>);
+            var pipelineBehaviorOpen2 = typeof(IPipelineBehavior<>);
 
             foreach (var asm in asmList.Where(a => a != null))
             {
@@ -36,8 +38,10 @@ namespace MyCompanyName.MyProjectName.Cqrs
                     var implementedHandlerInterfaces = interfaces
                         .Where(i => i.IsGenericType && (
                             i.GetGenericTypeDefinition() == commandHandlerOpen ||
+                            i.GetGenericTypeDefinition() == commandHandlerOpen2 ||
                             i.GetGenericTypeDefinition() == queryHandlerOpen ||
-                            i.GetGenericTypeDefinition() == pipelineBehaviorOpen))
+                            i.GetGenericTypeDefinition() == pipelineBehaviorOpen ||
+                            i.GetGenericTypeDefinition() == pipelineBehaviorOpen2))
                         .ToArray();
 
                     if (implementedHandlerInterfaces.Length == 0)
