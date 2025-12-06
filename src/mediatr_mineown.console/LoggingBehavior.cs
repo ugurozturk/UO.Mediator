@@ -1,3 +1,5 @@
+using MyCompanyName.MyProjectName.Cqrs;
+
 public class LoggingBehavior<TInput, TOutput> : IPipelineBehavior<TInput, TOutput>
 {
     public async Task<TOutput> HandleAsync(TInput input, Func<Task<TOutput>> next, CancellationToken cancellationToken = default)

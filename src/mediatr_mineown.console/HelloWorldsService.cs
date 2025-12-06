@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Volo.Abp.DependencyInjection;
+using MyCompanyName.MyProjectName.Cqrs;
 
 namespace MyCompanyName.MyProjectName;
 
