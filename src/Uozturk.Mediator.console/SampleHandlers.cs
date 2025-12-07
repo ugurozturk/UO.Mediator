@@ -13,8 +13,8 @@ public class PingCommandNonMessageHandler : ICommandHandler<PingCommandNonMessag
 {
     public Task HandleAsync(PingCommandNonMessage command, CancellationToken cancellationToken = default)
     {
-        Console.WriteLine("PingCommandNonMessageHandler");
-        return Task.FromResult($"Pong: {command.Message}");
+        // lightweight handler for benchmarking - do minimal work
+        return Task.CompletedTask;
     }
 }
 

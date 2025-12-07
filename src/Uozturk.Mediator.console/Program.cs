@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
 using Volo.Abp;
+using BenchmarkDotNet.Running;
 using Uozturk.Mediator.Cqrs;
 
 namespace MyCompanyName.MyProjectName;
@@ -15,6 +16,13 @@ public class Program
 {
     public async static Task<int> Main(string[] args)
     {
+        // If user requested BenchmarkDotNet run, run benchmarks and exit
+        if (args is not null && args.Length > 0 && Array.Exists(args, a => a.Equals("--benchmark", StringComparison.OrdinalIgnoreCase)))
+        {
+            BenchmarkRunner.Run<MyCompanyName.MyProjectName.Benchmarks.MediatorBenchmarks>();
+            return 0;
+        }
+
         Log.Logger = new LoggerConfiguration()
 #if DEBUG
             .MinimumLevel.Debug()

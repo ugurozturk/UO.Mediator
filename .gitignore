@@ -58,3 +58,5 @@ nunit-*.xml
 
 # Temporary files
 .DS_Store
+*.log
+BenchmarkDotNet.Artifacts/*

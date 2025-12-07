@@ -16,6 +16,7 @@ public class MyProjectNameHostedService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        // Run a quick functionality demo
         await _helloWorldService.SayHelloAsync();
     }
 
