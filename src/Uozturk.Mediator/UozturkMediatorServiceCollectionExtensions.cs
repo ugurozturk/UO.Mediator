@@ -26,7 +26,6 @@ public static class UozturkMediatorServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configure);
 
         services.TryAddTransient<IRequestDispatcher, RequestDispatcher>();
-        services.TryAddTransient<IRequestCancellationTokenProvider, DefaultRequestCancellationTokenProvider>();
         services.TryAddTransient<RequestGraphValidator>();
         services.TryAddEnumerable(ServiceDescriptor.Transient(
             typeof(IRequestBehavior<,>),

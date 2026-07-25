@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Uozturk.Mediator/Uozturk.Mediator.csproj" />
   </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Uozturk.Mediator.Tests/Uozturk.Mediator.Tests.csproj" />
+  </Folder>
 </Solution>

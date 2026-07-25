@@ -7,58 +7,38 @@ namespace Uozturk.Mediator.Dispatching;
 /// Default implementation of <see cref="IRequestDispatcher"/>.
 /// Caches closed-generic executors per (request, response) pair and builds the behaviour chain once.
 /// </summary>
-public class RequestDispatcher(
-    IServiceProvider serviceProvider,
-    IRequestCancellationTokenProvider cancellationTokenProvider) : IRequestDispatcher
+public class RequestDispatcher(IServiceProvider serviceProvider) : IRequestDispatcher
 {
     private static readonly ConcurrentDictionary<(Type Request, Type Response), IRequestExecutor> Executors = new();
     private readonly IServiceProvider _serviceProvider = serviceProvider;
 
     /// <inheritdoc />
-    public async Task DispatchAsync(IRequest request, CancellationToken cancellationToken = default)
+    public Task DispatchAsync(IRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        cancellationToken = cancellationTokenProvider.GetCancellationToken(cancellationToken);
         var requestType = request.GetType();
         var executor = Executors.GetOrAdd(
             (requestType, typeof(void)),
             static key => CreateNoResponseExecutor(key.Request));
 
-        using (cancellationTokenProvider.Use(cancellationToken))
-        {
-            await ((INoResponseRequestExecutor)executor).ExecuteAsync(
-                request,
-                _serviceProvider,
-                cancellationToken);
-        }
+        return ((INoResponseRequestExecutor)executor).ExecuteAsync(request, _serviceProvider);
     }
 
     /// <inheritdoc />
-    public async Task<TResponse> DispatchAsync<TResponse>(
-        IRequest<TResponse> request,
-        CancellationToken cancellationToken = default)
+    public Task<TResponse> DispatchAsync<TResponse>(IRequest<TResponse> request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        cancellationToken = cancellationTokenProvider.GetCancellationToken(cancellationToken);
-        using (cancellationTokenProvider.Use(cancellationToken))
-        {
-            return await ExecuteAsync(request, cancellationToken);
-        }
+        return ExecuteAsync(request);
     }
 
-    private Task<TResponse> ExecuteAsync<TResponse>(
-        IRequest<TResponse> request,
-        CancellationToken cancellationToken)
+    private Task<TResponse> ExecuteAsync<TResponse>(IRequest<TResponse> request)
     {
         var requestType = request.GetType();
         var executor = Executors.GetOrAdd(
             (requestType, typeof(TResponse)),
             static key => CreateExecutor(key.Request, key.Response));
 
-        return ((IRequestExecutor<TResponse>)executor).ExecuteAsync(
-            request,
-            _serviceProvider,
-            cancellationToken);
+        return ((IRequestExecutor<TResponse>)executor).ExecuteAsync(request, _serviceProvider);
     }
 
     private static IRequestExecutor CreateExecutor(Type requestType, Type responseType)
@@ -81,16 +61,14 @@ public class RequestDispatcher(
     {
         Task<TResponse> ExecuteAsync(
             IRequest<TResponse> request,
-            IServiceProvider serviceProvider,
-            CancellationToken cancellationToken);
+            IServiceProvider serviceProvider);
     }
 
     private interface INoResponseRequestExecutor : IRequestExecutor
     {
         Task ExecuteAsync(
             IRequest request,
-            IServiceProvider serviceProvider,
-            CancellationToken cancellationToken);
+            IServiceProvider serviceProvider);
     }
 
     private sealed class NoResponseRequestExecutor<TRequest> : INoResponseRequestExecutor
@@ -98,8 +76,7 @@ public class RequestDispatcher(
     {
         public async Task ExecuteAsync(
             IRequest request,
-            IServiceProvider serviceProvider,
-            CancellationToken cancellationToken)
+            IServiceProvider serviceProvider)
         {
             var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest>>();
             var behaviors = serviceProvider
@@ -110,7 +87,7 @@ public class RequestDispatcher(
 
             RequestHandlerDelegate<Unit> next = async () =>
             {
-                await handler.HandleAsync((TRequest)request, cancellationToken);
+                await handler.HandleAsync((TRequest)request);
                 return Unit.Value;
             };
 
@@ -118,7 +95,7 @@ public class RequestDispatcher(
             {
                 var behavior = behaviors[index];
                 var capturedNext = next;
-                next = () => behavior.HandleAsync((TRequest)request, capturedNext, cancellationToken);
+                next = () => behavior.HandleAsync((TRequest)request, capturedNext);
             }
 
             await next();
@@ -130,8 +107,7 @@ public class RequestDispatcher(
     {
         public Task<TResponse> ExecuteAsync(
             IRequest<TResponse> request,
-            IServiceProvider serviceProvider,
-            CancellationToken cancellationToken)
+            IServiceProvider serviceProvider)
         {
             var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
             var behaviors = serviceProvider
@@ -140,14 +116,13 @@ public class RequestDispatcher(
                 .ThenBy(x => x.GetType().FullName, StringComparer.Ordinal)
                 .ToArray();
 
-            RequestHandlerDelegate<TResponse> next = () =>
-                handler.HandleAsync((TRequest)request, cancellationToken);
+            RequestHandlerDelegate<TResponse> next = () => handler.HandleAsync((TRequest)request);
 
             for (var index = behaviors.Length - 1; index >= 0; index--)
             {
                 var behavior = behaviors[index];
                 var capturedNext = next;
-                next = () => behavior.HandleAsync((TRequest)request, capturedNext, cancellationToken);
+                next = () => behavior.HandleAsync((TRequest)request, capturedNext);
             }
 
             return next();

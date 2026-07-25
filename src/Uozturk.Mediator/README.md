@@ -1,6 +1,10 @@
 # Uozturk.Mediator
 
-Lightweight request dispatcher / mediator for .NET applications. It keeps request handlers and pipeline behaviours in a small framework-neutral package.
+Lightweight, framework-neutral request dispatcher / mediator for .NET applications.
+
+## Requirements
+
+- .NET 10
 
 ## Installation
 
@@ -10,7 +14,8 @@ dotnet add package Uozturk.Mediator
 
 ## Quick start
 
-Register the dispatcher and explicitly list the assemblies that contain handlers and behaviours:
+Register the dispatcher and explicitly list the assemblies that contain handlers and
+behaviours:
 
 ```csharp
 services.AddUozturkMediator(typeof(CreateOrderHandler).Assembly);
@@ -25,7 +30,7 @@ public sealed record CreateOrderRequest(string CustomerName) : IRequest<Guid>;
 
 public sealed class CreateOrderHandler : IRequestHandler<CreateOrderRequest, Guid>
 {
-    public Task<Guid> HandleAsync(CreateOrderRequest request, CancellationToken cancellationToken = default)
+    public Task<Guid> HandleAsync(CreateOrderRequest request)
     {
         return Task.FromResult(Guid.NewGuid());
     }
@@ -35,18 +40,11 @@ public sealed class CreateOrderHandler : IRequestHandler<CreateOrderRequest, Gui
 Dispatch from an application service:
 
 ```csharp
-public class OrderAppService : ApplicationService
+public class OrderService(IRequestDispatcher dispatcher)
 {
-    private readonly IRequestDispatcher _dispatcher;
-
-    public OrderAppService(IRequestDispatcher dispatcher)
+    public Task<Guid> CreateAsync(CreateOrderRequest input)
     {
-        _dispatcher = dispatcher;
-    }
-
-    public async Task<Guid> CreateAsync(CreateOrderRequest input)
-    {
-        return await _dispatcher.DispatchAsync(input);
+        return dispatcher.DispatchAsync(input);
     }
 }
 ```
@@ -58,7 +56,7 @@ public sealed record SendNotificationRequest(string Message) : IRequest;
 
 public sealed class SendNotificationHandler : IRequestHandler<SendNotificationRequest>
 {
-    public Task HandleAsync(SendNotificationRequest request, CancellationToken cancellationToken = default)
+    public Task HandleAsync(SendNotificationRequest request)
     {
         // side-effect only
         return Task.CompletedTask;
@@ -66,20 +64,51 @@ public sealed class SendNotificationHandler : IRequestHandler<SendNotificationRe
 }
 ```
 
+## Cancellation
+
+Cancellation is owned by the consuming application. The mediator does not define or register
+a cancellation token provider. A handler or behaviour that needs cancellation support injects
+the provider chosen by its application and checks or forwards its token:
+
+```csharp
+public interface IApplicationCancellationTokenProvider
+{
+    CancellationToken Token { get; }
+}
+
+public sealed class ImportOrdersHandler(
+    IApplicationCancellationTokenProvider cancellationTokenProvider)
+    : IRequestHandler<ImportOrdersRequest>
+{
+    public async Task HandleAsync(ImportOrdersRequest request)
+    {
+        cancellationTokenProvider.Token.ThrowIfCancellationRequested();
+
+        await ImportAsync(
+            request,
+            cancellationTokenProvider.Token);
+    }
+}
+```
+
+The dispatcher does not call `ThrowIfCancellationRequested()` automatically. Handlers and
+behaviours that do not inject an application-level provider remain cancellation-agnostic.
+Applications can use an existing framework provider or define their own abstraction.
+
 ## Pipeline behaviours
 
 Implement `IRequestBehavior<TRequest, TResponse>` to add cross-cutting concerns:
 
 ```csharp
-public sealed class ValidationBehavior<TRequest, TResponse> : IRequestBehavior<TRequest, TResponse>
+public sealed class ValidationBehavior<TRequest, TResponse>
+    : IRequestBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
     public int Order => 0;
 
     public async Task<TResponse> HandleAsync(
         TRequest request,
-        RequestHandlerDelegate<TResponse> next,
-        CancellationToken cancellationToken = default)
+        RequestHandlerDelegate<TResponse> next)
     {
         // before handler
         var response = await next();
@@ -89,7 +118,8 @@ public sealed class ValidationBehavior<TRequest, TResponse> : IRequestBehavior<T
 }
 ```
 
-The built-in `RequestLoggingBehaviour` runs at `Order = int.MinValue` and logs request duration. Requests slower than the configured threshold are logged as warnings.
+The built-in `RequestLoggingBehavior` runs at `Order = int.MinValue` and logs request
+duration. Requests slower than the configured threshold are logged as warnings.
 
 ## Configuration
 
@@ -102,15 +132,35 @@ services.AddUozturkMediator(options =>
 
 ## Startup validation
 
-Call `ValidateUozturkMediator()` during startup after the service provider is built. It ensures every concrete request in the registered assemblies has exactly one handler and that the handler can be resolved from DI.
+Call `ValidateUozturkMediator()` during application initialization after the service provider
+is built. It ensures:
+
+- Every concrete request in the registered assemblies has exactly one handler.
+- Every handler can be resolved from dependency injection.
 
 ```csharp
 serviceProvider.ValidateUozturkMediator();
 ```
 
+## Migrating from 1.x
+
+Version 2.0 removes all `CancellationToken` parameters from dispatcher, handler and behaviour
+contracts.
+
+1. Remove `CancellationToken` parameters from `DispatchAsync` calls and `HandleAsync`
+   implementations.
+2. Remove registrations and adapters for
+   `Uozturk.Mediator.Dispatching.IRequestCancellationTokenProvider`.
+3. Inject the consuming application's own cancellation provider only into handlers or
+   behaviours that actively check cancellation or pass a token to another API.
+
 ## Design notes
 
-- Handlers are registered as transient services from the assemblies passed to `AddUozturkMediator`.
-- Multiple behaviours for the same request/response pair are supported via `TryAddEnumerable`.
-- The dispatcher caches a closed-generic executor per `(request, response)` pair, so reflection is not used per dispatch.
-- This package does **not** replace unit of work, authorization or feature management boundaries. Keep those concerns in the application framework or inside handlers as appropriate.
+- Handlers are registered as transient services from the assemblies passed to
+  `AddUozturkMediator`.
+- Multiple behaviours for the same request/response pair are supported via
+  `TryAddEnumerable`.
+- The dispatcher caches a closed-generic executor per `(request, response)` pair, so
+  reflection is not used per dispatch.
+- The package does not replace unit of work, authorization or feature management boundaries.
+  Keep those concerns in the consuming framework or inside handlers as appropriate.

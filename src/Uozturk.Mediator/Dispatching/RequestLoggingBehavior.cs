@@ -21,8 +21,7 @@ public class RequestLoggingBehavior<TRequest, TResponse>(
     /// <inheritdoc />
     public async Task<TResponse> HandleAsync(
         TRequest request,
-        RequestHandlerDelegate<TResponse> next,
-        CancellationToken cancellationToken = default)
+        RequestHandlerDelegate<TResponse> next)
     {
         var requestName = typeof(TRequest).Name;
         var stopwatch = Stopwatch.StartNew();

@@ -1,6 +1,5 @@
-using System.Threading;
-using System.Threading.Tasks;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace Uozturk.Mediator.Dispatching;
 
@@ -41,7 +40,7 @@ public interface IRequestHandler<in TRequest, TResponse>
     /// <summary>
     /// Handles the request and returns a response.
     /// </summary>
-    Task<TResponse> HandleAsync(TRequest request, CancellationToken cancellationToken = default);
+    Task<TResponse> HandleAsync(TRequest request);
 }
 
 /// <summary>
@@ -54,16 +53,14 @@ public interface IRequestHandler<in TRequest> : IRequestHandler<TRequest, Unit>
     /// <summary>
     /// Handles the request.
     /// </summary>
-    new Task HandleAsync(TRequest request, CancellationToken cancellationToken = default);
+    new Task HandleAsync(TRequest request);
 
     /// <summary>
     /// Explicit interface implementation that adapts the void handler to the generic pipeline.
     /// </summary>
-    async Task<Unit> IRequestHandler<TRequest, Unit>.HandleAsync(
-        TRequest request,
-        CancellationToken cancellationToken)
+    async Task<Unit> IRequestHandler<TRequest, Unit>.HandleAsync(TRequest request)
     {
-        await HandleAsync(request, cancellationToken);
+        await HandleAsync(request);
         return Unit.Value;
     }
 }
@@ -92,8 +89,7 @@ public interface IRequestBehavior<in TRequest, TResponse>
     /// </summary>
     Task<TResponse> HandleAsync(
         TRequest request,
-        RequestHandlerDelegate<TResponse> next,
-        CancellationToken cancellationToken = default);
+        RequestHandlerDelegate<TResponse> next);
 }
 
 /// <summary>
@@ -104,14 +100,12 @@ public interface IRequestDispatcher
     /// <summary>
     /// Dispatches a request that does not return a value.
     /// </summary>
-    Task DispatchAsync(IRequest request, CancellationToken cancellationToken = default);
+    Task DispatchAsync(IRequest request);
 
     /// <summary>
     /// Dispatches a request that returns a value of type <typeparamref name="TResponse"/>.
     /// </summary>
-    Task<TResponse> DispatchAsync<TResponse>(
-        IRequest<TResponse> request,
-        CancellationToken cancellationToken = default);
+    Task<TResponse> DispatchAsync<TResponse>(IRequest<TResponse> request);
 }
 
 /// <summary>
