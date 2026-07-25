@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Uozturk.Mediator/Uozturk.Mediator.csproj" />
+    <Project Path="src/Uozturk.Mediator.ApiExplorer/Uozturk.Mediator.ApiExplorer.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Uozturk.Mediator.Tests/Uozturk.Mediator.Tests.csproj" />
+    <Project Path="test/Uozturk.Mediator.ApiExplorer.Tests/Uozturk.Mediator.ApiExplorer.Tests.csproj" />
   </Folder>
 </Solution>

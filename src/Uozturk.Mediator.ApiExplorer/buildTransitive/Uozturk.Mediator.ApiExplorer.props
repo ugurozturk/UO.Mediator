@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <UozturkMediatorApiRootPath Condition="'$(UozturkMediatorApiRootPath)' == ''">/api/app</UozturkMediatorApiRootPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="UozturkMediatorApiRootPath" />
+  </ItemGroup>
+</Project>

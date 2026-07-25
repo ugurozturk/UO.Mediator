@@ -11,7 +11,7 @@
     <IsPackable>true</IsPackable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>Uozturk.Mediator</PackageId>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>uozturk</Authors>
     <Company>uozturk</Company>
     <Description>Lightweight request dispatcher / mediator for .NET applications.</Description>
