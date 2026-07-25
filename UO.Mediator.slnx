@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/UO.Mediator/UO.Mediator.csproj" />
+    <Project Path="src/UO.Mediator.ApiExplorer/UO.Mediator.ApiExplorer.csproj" />
+  </Folder>
+  <Folder Name="/demo/">
+    <Project Path="demo/UO.Mediator.Demo/UO.Mediator.Demo.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/UO.Mediator.Tests/UO.Mediator.Tests.csproj" />
+    <Project Path="test/UO.Mediator.ApiExplorer.Tests/UO.Mediator.ApiExplorer.Tests.csproj" />
+  </Folder>
+</Solution>

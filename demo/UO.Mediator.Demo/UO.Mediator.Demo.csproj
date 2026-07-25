@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <!-- Convention root for generated endpoints (default: /api/app) -->
+    <UOMediatorApiRootPath>/api/app</UOMediatorApiRootPath>
+    <UOMediatorControllerPrefix>App</UOMediatorControllerPrefix>
+    <UOMediatorControllerSuffix>Service</UOMediatorControllerSuffix>
+    <!-- Persist source-generator output under obj/ for inspection -->
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/UO.Mediator/UO.Mediator.csproj" />
+    <!-- Reference the generator as an analyzer so it produces controllers in this assembly -->
+    <ProjectReference Include="../../src/UO.Mediator.ApiExplorer/UO.Mediator.ApiExplorer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- NuGet imports these declarations from buildTransitive; project references need them explicitly. -->
+  <ItemGroup>
+    <CompilerVisibleProperty Include="UOMediatorApiRootPath" />
+    <CompilerVisibleProperty Include="UOMediatorControllerPrefix" />
+    <CompilerVisibleProperty Include="UOMediatorControllerSuffix" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.16.16" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
+  </ItemGroup>
+
+  <Target Name="ClearEmittedCompilerGeneratedFiles"
+          BeforeTargets="CoreCompile"
+          Condition="'$(EmitCompilerGeneratedFiles)' == 'true' and '$(CompilerGeneratedFilesOutputPath)' != ''">
+    <RemoveDir Directories="$(CompilerGeneratedFilesOutputPath)" />
+  </Target>
+
+</Project>

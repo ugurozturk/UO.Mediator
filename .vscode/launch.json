@@ -2,13 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Demo: Uozturk.Mediator.Demo",
+            "name": "Demo: UO.Mediator.Demo",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build-demo",
-            "program": "${workspaceFolder}/demo/Uozturk.Mediator.Demo/bin/Debug/net10.0/Uozturk.Mediator.Demo.dll",
+            "program": "${workspaceFolder}/demo/UO.Mediator.Demo/bin/Debug/net10.0/UO.Mediator.Demo.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/demo/Uozturk.Mediator.Demo",
+            "cwd": "${workspaceFolder}/demo/UO.Mediator.Demo",
             "stopAtEntry": false,
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development",

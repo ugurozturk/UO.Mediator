@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/demo/Uozturk.Mediator.Demo/Uozturk.Mediator.Demo.csproj",
+                "${workspaceFolder}/demo/UO.Mediator.Demo/UO.Mediator.Demo.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],

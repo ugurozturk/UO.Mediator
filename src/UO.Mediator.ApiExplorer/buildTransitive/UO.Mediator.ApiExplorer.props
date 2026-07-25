@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <UOMediatorApiRootPath Condition="'$(UOMediatorApiRootPath)' == ''">/api/app</UOMediatorApiRootPath>
+    <UOMediatorControllerPrefix Condition="'$(UOMediatorControllerPrefix)' == ''"></UOMediatorControllerPrefix>
+    <UOMediatorControllerSuffix Condition="'$(UOMediatorControllerSuffix)' == ''"></UOMediatorControllerSuffix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="UOMediatorApiRootPath" />
+    <CompilerVisibleProperty Include="UOMediatorControllerPrefix" />
+    <CompilerVisibleProperty Include="UOMediatorControllerSuffix" />
+  </ItemGroup>
+</Project>
