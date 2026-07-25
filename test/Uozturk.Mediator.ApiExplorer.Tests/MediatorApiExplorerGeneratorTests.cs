@@ -62,6 +62,7 @@ public class MediatorApiExplorerGeneratorTests
             StringComparison.Ordinal);
         Assert.Contains("FromQueryAttribute", generated, StringComparison.Ordinal);
         Assert.Contains("FromBodyAttribute", generated, StringComparison.Ordinal);
+        Assert.Contains("TagsAttribute(\"CreateBook\")", generated, StringComparison.Ordinal);
         Assert.Contains("return NoContent();", generated, StringComparison.Ordinal);
         Assert.Equal(
             5,

@@ -25,7 +25,9 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         "build_property.UozturkMediatorApiRootPath";
 
     private static readonly SymbolDisplayFormat FullyQualifiedTypeFormat =
-        SymbolDisplayFormat.FullyQualifiedFormat;
+        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     private static readonly DiagnosticDescriptor MissingDependency = new(
         "UOMA001",
@@ -427,6 +429,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             route,
             controllerName,
             controllerName + ".g.cs",
+            RemoveSuffix(requestType.Name),
             settings.AuthorizationPolicy,
             settings.AllowAnonymous,
             location);
@@ -768,6 +771,9 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         builder.AppendLine("namespace Uozturk.Mediator.ApiExplorer.Generated");
         builder.AppendLine("{");
         builder.AppendLine("    [global::Microsoft.AspNetCore.Mvc.ApiControllerAttribute]");
+        builder.Append("    [global::Microsoft.AspNetCore.Http.TagsAttribute(\"")
+            .Append(EscapeCSharpString(endpoint.Tag))
+            .AppendLine("\")]");
 
         if (endpoint.AllowAnonymous)
         {
@@ -891,6 +897,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             string route,
             string controllerName,
             string hintName,
+            string tag,
             string? authorizationPolicy,
             bool allowAnonymous,
             Location location)
@@ -903,6 +910,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             Route = route;
             ControllerName = controllerName;
             HintName = hintName;
+            Tag = tag;
             AuthorizationPolicy = authorizationPolicy;
             AllowAnonymous = allowAnonymous;
             Location = location;
@@ -923,6 +931,8 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         public string ControllerName { get; }
 
         public string HintName { get; }
+
+        public string Tag { get; }
 
         public string? AuthorizationPolicy { get; }
 

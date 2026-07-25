@@ -9,6 +9,8 @@
     <AssemblyName>Uozturk.Mediator.ApiExplorer</AssemblyName>
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- Analyzer-only package: the dll ships under analyzers/, so lib/ref folders are empty by design -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
 
     <!-- NuGet packaging -->
     <IsPackable>true</IsPackable>
