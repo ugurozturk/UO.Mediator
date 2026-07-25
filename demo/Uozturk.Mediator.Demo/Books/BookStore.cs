@@ -42,22 +42,25 @@ public sealed class BookStore
     public void Clear() => _books.Clear();
 }
 
-// Requests marked with MediatorApiExplorer get a generated controller each.
+// Requests with the same ControllerName become actions in one generated partial controller.
 
-[MediatorApiExplorer]
+[MediatorApiExplorer(ControllerName = "Book")]
 public sealed record GetListBooksRequest : IRequest<IReadOnlyList<Book>>;
 
-[MediatorApiExplorer]
+[MediatorApiExplorer(ControllerName = "Book")]
 public sealed record GetBookRequest(Guid Id) : IRequest<Book?>;
 
-[MediatorApiExplorer]
+[MediatorApiExplorer(ControllerName = "Book")]
 public sealed record CreateBookRequest(string Title, string Author) : IRequest<Book>;
 
-[MediatorApiExplorer]
+[MediatorApiExplorer(ControllerName = "Book")]
 public sealed record UpdateBookCommand(Guid Id, string Title, string Author) : IRequest<Book?>;
 
-[MediatorApiExplorer]
+[MediatorApiExplorer(ControllerName = "Book")]
 public sealed record DeleteBookRequest(Guid Id) : IRequest;
 
-[MediatorApiExplorer(Route = "/api/app/books/clear", HttpMethod = MediatorHttpMethod.Post)]
+[MediatorApiExplorer(
+    ControllerName = "Book",
+    Route = "/api/app/books/clear",
+    HttpMethod = MediatorHttpMethod.Post)]
 public sealed record ClearBooksCommand : IRequest;

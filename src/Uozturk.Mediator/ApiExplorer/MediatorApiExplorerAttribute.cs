@@ -8,6 +8,12 @@ namespace Uozturk.Mediator.ApiExplorer;
 public sealed class MediatorApiExplorerAttribute : Attribute
 {
     /// <summary>
+    /// Groups the request with other requests in the same generated controller.
+    /// When omitted, the controller name is derived from the request name convention.
+    /// </summary>
+    public string? ControllerName { get; set; }
+
+    /// <summary>
     /// Overrides the convention-based absolute route.
     /// </summary>
     public string? Route { get; set; }

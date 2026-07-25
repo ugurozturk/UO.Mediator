@@ -13,3 +13,4 @@ UOMA003 | Uozturk.Mediator.ApiExplorer | Error | Generated endpoint route is inv
 UOMA004 | Uozturk.Mediator.ApiExplorer | Error | Generated verb and route conflict
 UOMA005 | Uozturk.Mediator.ApiExplorer | Error | Authorization settings conflict
 UOMA006 | Uozturk.Mediator.ApiExplorer | Error | HTTP method setting is invalid
+UOMA007 | Uozturk.Mediator.ApiExplorer | Error | Generated controller configuration is invalid

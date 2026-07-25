@@ -14,6 +14,8 @@ internal static class GeneratorTestHarness
     public static GeneratorExecution Run(
         string source,
         string rootPath = "/api/app",
+        string controllerPrefix = "",
+        string controllerSuffix = "",
         params MetadataReference[] additionalReferences)
     {
         var compilation = CreateCompilation(
@@ -24,7 +26,9 @@ internal static class GeneratorTestHarness
         var optionsProvider = new TestAnalyzerConfigOptionsProvider(
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["build_property.UozturkMediatorApiRootPath"] = rootPath
+                ["build_property.UozturkMediatorApiRootPath"] = rootPath,
+                ["build_property.UozturkMediatorControllerPrefix"] = controllerPrefix,
+                ["build_property.UozturkMediatorControllerSuffix"] = controllerSuffix
             });
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(

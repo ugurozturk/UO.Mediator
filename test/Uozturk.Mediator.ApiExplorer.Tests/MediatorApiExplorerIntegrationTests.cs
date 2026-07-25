@@ -22,7 +22,7 @@ public class MediatorApiExplorerIntegrationTests
 
             namespace IntegrationContracts;
 
-            [MediatorApiExplorer]
+            [MediatorApiExplorer(ControllerName = "Catalog")]
             public sealed record GetGreetingRequest(string Name) : IRequest<string>;
 
             public sealed class GetGreetingHandler
@@ -34,7 +34,7 @@ public class MediatorApiExplorerIntegrationTests
                 }
             }
 
-            [MediatorApiExplorer]
+            [MediatorApiExplorer(ControllerName = "Catalog")]
             public sealed record RebuildCatalogCommand : IRequest;
 
             public sealed class RebuildCatalogHandler
@@ -49,6 +49,12 @@ public class MediatorApiExplorerIntegrationTests
 
         var execution = GeneratorTestHarness.Run(source);
         GeneratorTestHarness.AssertNoCompilationErrors(execution);
+        Assert.Single(
+            execution.RunResult.Results.SelectMany(result => result.GeneratedSources));
+        Assert.Contains(
+            "public partial class CatalogController",
+            GeneratorTestHarness.GetGeneratedSource(execution),
+            StringComparison.Ordinal);
         var generatedAssembly = GeneratorTestHarness.EmitAndLoad(execution);
 
         var builder = WebApplication.CreateBuilder();

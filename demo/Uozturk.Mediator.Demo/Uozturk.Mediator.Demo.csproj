@@ -7,6 +7,8 @@
     <IsPackable>false</IsPackable>
     <!-- Convention root for generated endpoints (default: /api/app) -->
     <UozturkMediatorApiRootPath>/api/app</UozturkMediatorApiRootPath>
+    <UozturkMediatorControllerPrefix>App</UozturkMediatorControllerPrefix>
+    <UozturkMediatorControllerSuffix>Service</UozturkMediatorControllerSuffix>
     <!-- Persist source-generator output under obj/ for inspection -->
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
   </PropertyGroup>
@@ -17,11 +19,24 @@
     <ProjectReference Include="../../src/Uozturk.Mediator.ApiExplorer/Uozturk.Mediator.ApiExplorer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <!-- NuGet imports these declarations from buildTransitive; project references need them explicitly. -->
+  <ItemGroup>
+    <CompilerVisibleProperty Include="UozturkMediatorApiRootPath" />
+    <CompilerVisibleProperty Include="UozturkMediatorControllerPrefix" />
+    <CompilerVisibleProperty Include="UozturkMediatorControllerSuffix" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.16.16" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
   </ItemGroup>
+
+  <Target Name="ClearEmittedCompilerGeneratedFiles"
+          BeforeTargets="CoreCompile"
+          Condition="'$(EmitCompilerGeneratedFiles)' == 'true' and '$(CompilerGeneratedFilesOutputPath)' != ''">
+    <RemoveDir Directories="$(CompilerGeneratedFilesOutputPath)" />
+  </Target>
 
 </Project>

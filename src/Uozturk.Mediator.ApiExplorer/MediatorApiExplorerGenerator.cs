@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Uozturk.Mediator.ApiExplorer.Generators;
 
@@ -23,6 +24,10 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
     private const string DefaultRootPath = "/api/app";
     private const string RootPathBuildProperty =
         "build_property.UozturkMediatorApiRootPath";
+    private const string ControllerPrefixBuildProperty =
+        "build_property.UozturkMediatorControllerPrefix";
+    private const string ControllerSuffixBuildProperty =
+        "build_property.UozturkMediatorControllerSuffix";
 
     private static readonly SymbolDisplayFormat FullyQualifiedTypeFormat =
         SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
@@ -77,26 +82,54 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor InvalidController = new(
+        "UOMA007",
+        "Invalid generated controller configuration",
+        "The generated controller for request '{0}' is invalid: {1}",
+        "Uozturk.Mediator.ApiExplorer",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var rootPath = context.AnalyzerConfigOptionsProvider.Select(
+        var options = context.AnalyzerConfigOptionsProvider.Select(
             static (options, _) =>
             {
-                return options.GlobalOptions.TryGetValue(RootPathBuildProperty, out var value)
-                    ? value
-                    : DefaultRootPath;
+                return new GeneratorOptions(
+                    GetGlobalOption(
+                        options,
+                        RootPathBuildProperty,
+                        DefaultRootPath),
+                    GetGlobalOption(
+                        options,
+                        ControllerPrefixBuildProperty,
+                        string.Empty),
+                    GetGlobalOption(
+                        options,
+                        ControllerSuffixBuildProperty,
+                        string.Empty));
             });
 
         context.RegisterSourceOutput(
-            context.CompilationProvider.Combine(rootPath),
+            context.CompilationProvider.Combine(options),
             static (productionContext, input) =>
                 Generate(productionContext, input.Left, input.Right));
+    }
+
+    private static string GetGlobalOption(
+        AnalyzerConfigOptionsProvider options,
+        string key,
+        string defaultValue)
+    {
+        return options.GlobalOptions.TryGetValue(key, out var value)
+            ? value
+            : defaultValue;
     }
 
     private static void Generate(
         SourceProductionContext context,
         Compilation compilation,
-        string rootPath)
+        GeneratorOptions options)
     {
         var attributeType = compilation.GetTypeByMetadataName(AttributeMetadataName);
         var genericRequestType = compilation.GetTypeByMetadataName(GenericRequestMetadataName);
@@ -113,13 +146,42 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             return;
         }
 
-        if (!TryNormalizeRootPath(rootPath, out var normalizedRootPath, out var rootPathError))
+        if (!TryNormalizeRootPath(
+                options.RootPath,
+                out var normalizedRootPath,
+                out var rootPathError))
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 InvalidRoute,
                 Location.None,
                 "<API host>",
                 rootPathError));
+            return;
+        }
+
+        if (!TryValidateControllerFragment(
+                options.ControllerPrefix,
+                allowEmpty: true,
+                out var controllerPrefixError))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                InvalidController,
+                Location.None,
+                "<API host>",
+                $"UozturkMediatorControllerPrefix {controllerPrefixError}"));
+            return;
+        }
+
+        if (!TryValidateControllerFragment(
+                options.ControllerSuffix,
+                allowEmpty: true,
+                out var controllerSuffixError))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                InvalidController,
+                Location.None,
+                "<API host>",
+                $"UozturkMediatorControllerSuffix {controllerSuffixError}"));
             return;
         }
 
@@ -141,7 +203,9 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
                 attributeType!,
                 genericRequestType!,
                 unitType!,
-                normalizedRootPath);
+                normalizedRootPath,
+                options.ControllerPrefix,
+                options.ControllerSuffix);
 
             if (endpoint is not null)
             {
@@ -150,14 +214,28 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         }
 
         var conflictingEndpoints = FindAndReportRouteConflicts(context, endpoints);
-        foreach (var endpoint in endpoints)
-        {
-            if (conflictingEndpoints.Contains(endpoint))
-            {
-                continue;
-            }
+        var validEndpoints = endpoints
+            .Where(endpoint => !conflictingEndpoints.Contains(endpoint))
+            .ToArray();
 
-            context.AddSource(endpoint.HintName, RenderController(endpoint));
+        foreach (var controllerGroup in validEndpoints
+                     .GroupBy(
+                         static endpoint => endpoint.ControllerName,
+                         StringComparer.Ordinal)
+                     .OrderBy(static group => group.Key, StringComparer.Ordinal))
+        {
+            context.AddSource(
+                controllerGroup.Key + ".g.cs",
+                RenderController(
+                    controllerGroup.Key,
+                    controllerGroup
+                        .OrderBy(
+                            static endpoint => endpoint.ActionName,
+                            StringComparer.Ordinal)
+                        .ThenBy(
+                            static endpoint => endpoint.RequestDisplayName,
+                            StringComparer.Ordinal)
+                        .ToArray()));
         }
     }
 
@@ -267,7 +345,9 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         INamedTypeSymbol attributeType,
         INamedTypeSymbol genericRequestType,
         INamedTypeSymbol unitType,
-        string rootPath)
+        string rootPath,
+        string controllerPrefix,
+        string controllerSuffix)
     {
         var location = GetLocation(requestType, attributeType);
         var requestName = requestType.ToDisplayString(FullyQualifiedTypeFormat);
@@ -366,6 +446,45 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         }
 
         var convention = GetConvention(requestType.Name);
+        var controllerGroupName = settings.ControllerName ?? convention.ResourceName;
+        if (!TryValidateControllerFragment(
+                controllerGroupName,
+                allowEmpty: false,
+                out var controllerNameError))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                InvalidController,
+                location,
+                requestName,
+                $"ControllerName {controllerNameError}"));
+            return null;
+        }
+
+        var controllerName = controllerPrefix +
+                             controllerGroupName +
+                             controllerSuffix +
+                             "Controller";
+        if (!IsValidIdentifier(controllerName))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                InvalidController,
+                location,
+                requestName,
+                $"'{controllerName}' is not a valid C# controller class name"));
+            return null;
+        }
+
+        var actionBaseName = RemoveSuffix(requestType.Name);
+        if (actionBaseName.Length == 0)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                InvalidController,
+                location,
+                requestName,
+                "the request name does not produce a valid action name"));
+            return null;
+        }
+
         if (!TryGetHttpMethod(
                 settings.HttpMethodValue,
                 convention.HttpMethod,
@@ -411,15 +530,6 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         }
 
         var responseType = responseTypes[0];
-        var stableIdentity = requestType.ToDisplayString(
-            SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var hash = ComputeStableHash(stableIdentity);
-        var controllerName = "Mediator_" +
-                             SanitizeIdentifier(requestType.Name) +
-                             "_" +
-                             hash +
-                             "Controller";
-
         return new EndpointModel(
             requestType,
             requestName,
@@ -428,8 +538,8 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             httpMethod,
             route,
             controllerName,
-            controllerName + ".g.cs",
-            RemoveSuffix(requestType.Name),
+            actionBaseName + "Async",
+            controllerGroupName,
             settings.AuthorizationPolicy,
             settings.AllowAnonymous,
             location);
@@ -486,6 +596,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
 
     private static EndpointSettings ReadSettings(AttributeData attribute)
     {
+        string? controllerName = null;
         string? route = null;
         string? authorizationPolicy = null;
         var allowAnonymous = false;
@@ -495,6 +606,9 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         {
             switch (argument.Key)
             {
+                case "ControllerName":
+                    controllerName = argument.Value.Value as string;
+                    break;
                 case "Route":
                     route = argument.Value.Value as string;
                     break;
@@ -511,6 +625,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         }
 
         return new EndpointSettings(
+            controllerName,
             route,
             httpMethodValue,
             authorizationPolicy,
@@ -752,7 +867,49 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         return conflicts;
     }
 
-    private static string RenderController(EndpointModel endpoint)
+    private static string RenderController(
+        string controllerName,
+        IReadOnlyList<EndpointModel> endpoints)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("// <auto-generated />");
+        builder.AppendLine("#nullable enable");
+        builder.AppendLine();
+        builder.AppendLine("namespace Uozturk.Mediator.ApiExplorer.Generated");
+        builder.AppendLine("{");
+        builder.AppendLine("    [global::Microsoft.AspNetCore.Mvc.ApiControllerAttribute]");
+        builder.Append("    [global::Microsoft.AspNetCore.Http.TagsAttribute(\"")
+            .Append(EscapeCSharpString(endpoints[0].Tag))
+            .AppendLine("\")]");
+        builder.Append("    public partial class ")
+            .Append(controllerName)
+            .AppendLine(" : global::Microsoft.AspNetCore.Mvc.ControllerBase");
+        builder.AppendLine("    {");
+        builder.AppendLine(
+            "        private readonly global::Uozturk.Mediator.Dispatching.IRequestDispatcher _dispatcher;");
+        builder.AppendLine();
+        builder.Append("        public ")
+            .Append(controllerName)
+            .AppendLine("(");
+        builder.AppendLine(
+            "            global::Uozturk.Mediator.Dispatching.IRequestDispatcher dispatcher)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            _dispatcher = dispatcher;");
+        builder.AppendLine("        }");
+
+        foreach (var endpoint in endpoints)
+        {
+            RenderAction(builder, endpoint);
+        }
+
+        builder.AppendLine("    }");
+        builder.AppendLine("}");
+        return builder.ToString();
+    }
+
+    private static void RenderAction(
+        StringBuilder builder,
+        EndpointModel endpoint)
     {
         var requestTypeName = endpoint.RequestType.ToDisplayString(FullyQualifiedTypeFormat);
         var bindingAttribute = endpoint.HttpMethod == "GET" ||
@@ -764,45 +921,19 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
                                 endpoint.HttpMethod.ToLowerInvariant()) +
                             "Attribute";
 
-        var builder = new StringBuilder();
-        builder.AppendLine("// <auto-generated />");
-        builder.AppendLine("#nullable enable");
         builder.AppendLine();
-        builder.AppendLine("namespace Uozturk.Mediator.ApiExplorer.Generated");
-        builder.AppendLine("{");
-        builder.AppendLine("    [global::Microsoft.AspNetCore.Mvc.ApiControllerAttribute]");
-        builder.Append("    [global::Microsoft.AspNetCore.Http.TagsAttribute(\"")
-            .Append(EscapeCSharpString(endpoint.Tag))
-            .AppendLine("\")]");
-
         if (endpoint.AllowAnonymous)
         {
             builder.AppendLine(
-                "    [global::Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute]");
+                "        [global::Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute]");
         }
         else if (endpoint.AuthorizationPolicy is not null)
         {
-            builder.Append("    [global::Microsoft.AspNetCore.Authorization.AuthorizeAttribute(Policy = \"")
+            builder.Append("        [global::Microsoft.AspNetCore.Authorization.AuthorizeAttribute(Policy = \"")
                 .Append(EscapeCSharpString(endpoint.AuthorizationPolicy))
                 .AppendLine("\")]");
         }
 
-        builder.Append("    public sealed class ")
-            .Append(endpoint.ControllerName)
-            .AppendLine(" : global::Microsoft.AspNetCore.Mvc.ControllerBase");
-        builder.AppendLine("    {");
-        builder.AppendLine(
-            "        private readonly global::Uozturk.Mediator.Dispatching.IRequestDispatcher _dispatcher;");
-        builder.AppendLine();
-        builder.Append("        public ")
-            .Append(endpoint.ControllerName)
-            .AppendLine("(");
-        builder.AppendLine(
-            "            global::Uozturk.Mediator.Dispatching.IRequestDispatcher dispatcher)");
-        builder.AppendLine("        {");
-        builder.AppendLine("            _dispatcher = dispatcher;");
-        builder.AppendLine("        }");
-        builder.AppendLine();
         builder.Append("        [global::Microsoft.AspNetCore.Mvc.")
             .Append(httpAttribute)
             .Append("(\"")
@@ -811,15 +942,19 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
 
         if (endpoint.IsUnit)
         {
-            builder.AppendLine(
-                "        public async global::System.Threading.Tasks.Task<global::Microsoft.AspNetCore.Mvc.IActionResult> HandleAsync(");
+            builder.Append(
+                    "        public async global::System.Threading.Tasks.Task<global::Microsoft.AspNetCore.Mvc.IActionResult> ")
+                .Append(endpoint.ActionName)
+                .AppendLine("(");
         }
         else
         {
             builder.Append(
                     "        public async global::System.Threading.Tasks.Task<global::Microsoft.AspNetCore.Mvc.ActionResult<")
                 .Append(endpoint.ResponseTypeName)
-                .AppendLine(">> HandleAsync(");
+                .Append(">> ")
+                .Append(endpoint.ActionName)
+                .AppendLine("(");
         }
 
         builder.Append("            [global::Microsoft.AspNetCore.Mvc.")
@@ -844,9 +979,6 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         }
 
         builder.AppendLine("        }");
-        builder.AppendLine("    }");
-        builder.AppendLine("}");
-        return builder.ToString();
     }
 
     private static string EscapeCSharpString(string value)
@@ -858,32 +990,44 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             .Replace("\n", "\\n");
     }
 
-    private static string SanitizeIdentifier(string value)
+    private static bool TryValidateControllerFragment(
+        string? value,
+        bool allowEmpty,
+        out string error)
     {
-        var builder = new StringBuilder(value.Length);
-        foreach (var character in value)
+        if (string.IsNullOrEmpty(value))
         {
-            builder.Append(char.IsLetterOrDigit(character) || character == '_'
-                ? character
-                : '_');
+            if (allowEmpty)
+            {
+                error = string.Empty;
+                return true;
+            }
+
+            error = "cannot be empty";
+            return false;
         }
 
-        return builder.ToString();
+        if (value.Any(character =>
+                !char.IsLetterOrDigit(character) && character != '_'))
+        {
+            error = $"'{value}' must contain only letters, digits or '_'";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
     }
 
-    private static string ComputeStableHash(string value)
+    private static bool IsValidIdentifier(string value)
     {
-        const uint offset = 2166136261;
-        const uint prime = 16777619;
-        var hash = offset;
-
-        foreach (var character in value)
+        if (value.Length == 0 ||
+            (!char.IsLetter(value[0]) && value[0] != '_'))
         {
-            hash ^= character;
-            hash *= prime;
+            return false;
         }
 
-        return hash.ToString("x8", CultureInfo.InvariantCulture);
+        return value.Skip(1).All(character =>
+            char.IsLetterOrDigit(character) || character == '_');
     }
 
     private sealed class EndpointModel
@@ -896,7 +1040,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             string httpMethod,
             string route,
             string controllerName,
-            string hintName,
+            string actionName,
             string tag,
             string? authorizationPolicy,
             bool allowAnonymous,
@@ -909,7 +1053,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             HttpMethod = httpMethod;
             Route = route;
             ControllerName = controllerName;
-            HintName = hintName;
+            ActionName = actionName;
             Tag = tag;
             AuthorizationPolicy = authorizationPolicy;
             AllowAnonymous = allowAnonymous;
@@ -930,7 +1074,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
 
         public string ControllerName { get; }
 
-        public string HintName { get; }
+        public string ActionName { get; }
 
         public string Tag { get; }
 
@@ -944,16 +1088,20 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
     private sealed class EndpointSettings
     {
         public EndpointSettings(
+            string? controllerName,
             string? route,
             int httpMethodValue,
             string? authorizationPolicy,
             bool allowAnonymous)
         {
+            ControllerName = controllerName;
             Route = route;
             HttpMethodValue = httpMethodValue;
             AuthorizationPolicy = authorizationPolicy;
             AllowAnonymous = allowAnonymous;
         }
+
+        public string? ControllerName { get; }
 
         public string? Route { get; }
 
@@ -988,5 +1136,53 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         public string Prefix { get; }
 
         public string HttpMethod { get; }
+    }
+
+    private readonly struct GeneratorOptions : IEquatable<GeneratorOptions>
+    {
+        public GeneratorOptions(
+            string rootPath,
+            string controllerPrefix,
+            string controllerSuffix)
+        {
+            RootPath = rootPath;
+            ControllerPrefix = controllerPrefix;
+            ControllerSuffix = controllerSuffix;
+        }
+
+        public string RootPath { get; }
+
+        public string ControllerPrefix { get; }
+
+        public string ControllerSuffix { get; }
+
+        public bool Equals(GeneratorOptions other)
+        {
+            return string.Equals(RootPath, other.RootPath, StringComparison.Ordinal) &&
+                   string.Equals(
+                       ControllerPrefix,
+                       other.ControllerPrefix,
+                       StringComparison.Ordinal) &&
+                   string.Equals(
+                       ControllerSuffix,
+                       other.ControllerSuffix,
+                       StringComparison.Ordinal);
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is GeneratorOptions other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hashCode = RootPath.GetHashCode();
+                hashCode = (hashCode * 397) ^ ControllerPrefix.GetHashCode();
+                hashCode = (hashCode * 397) ^ ControllerSuffix.GetHashCode();
+                return hashCode;
+            }
+        }
     }
 }

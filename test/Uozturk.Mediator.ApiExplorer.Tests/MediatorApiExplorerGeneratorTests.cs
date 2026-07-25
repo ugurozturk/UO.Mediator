@@ -16,19 +16,19 @@ public class MediatorApiExplorerGeneratorTests
 
             namespace Contracts;
 
-            [MediatorApiExplorer]
+            [MediatorApiExplorer(ControllerName = "Book")]
             public sealed record GetListBooksRequest : IRequest<IReadOnlyList<string>>;
 
-            [MediatorApiExplorer]
+            [MediatorApiExplorer(ControllerName = "Book")]
             public sealed record CreateBookRequest(string Name) : IRequest<Guid>;
 
-            [MediatorApiExplorer]
+            [MediatorApiExplorer(ControllerName = "Book")]
             public sealed record UpdateBookCommand(Guid Id, string Name) : IRequest;
 
-            [MediatorApiExplorer]
+            [MediatorApiExplorer(ControllerName = "Book")]
             public sealed record DeleteBookRequest(Guid Id) : IRequest;
 
-            [MediatorApiExplorer]
+            [MediatorApiExplorer(ControllerName = "Maintenance")]
             public sealed record RebuildIndexCommand : IRequest;
             """;
 
@@ -62,10 +62,15 @@ public class MediatorApiExplorerGeneratorTests
             StringComparison.Ordinal);
         Assert.Contains("FromQueryAttribute", generated, StringComparison.Ordinal);
         Assert.Contains("FromBodyAttribute", generated, StringComparison.Ordinal);
-        Assert.Contains("TagsAttribute(\"CreateBook\")", generated, StringComparison.Ordinal);
+        Assert.Contains("public partial class BookController", generated, StringComparison.Ordinal);
+        Assert.Contains("TagsAttribute(\"Book\")", generated, StringComparison.Ordinal);
+        Assert.Contains("CreateBookAsync(", generated, StringComparison.Ordinal);
+        Assert.Contains("GetListBooksAsync(", generated, StringComparison.Ordinal);
+        Assert.Contains("UpdateBookAsync(", generated, StringComparison.Ordinal);
+        Assert.Contains("DeleteBookAsync(", generated, StringComparison.Ordinal);
         Assert.Contains("return NoContent();", generated, StringComparison.Ordinal);
         Assert.Equal(
-            5,
+            2,
             execution.RunResult.Results.SelectMany(result => result.GeneratedSources).Count());
         GeneratorTestHarness.AssertNoCompilationErrors(execution);
     }
@@ -78,16 +83,29 @@ public class MediatorApiExplorerGeneratorTests
             using Uozturk.Mediator.Dispatching;
 
             [MediatorApiExplorer(
+                ControllerName = "Catalog",
                 Route = "/api/catalog/rebuild",
                 HttpMethod = MediatorHttpMethod.Get,
                 AuthorizationPolicy = "Catalog.Read")]
             public sealed record RebuildCatalogRequest : IRequest<string>;
 
-            [MediatorApiExplorer(AllowAnonymous = true)]
+            [MediatorApiExplorer(ControllerName = "Catalog", AllowAnonymous = true)]
             public sealed record GetOrdersRequest : IRequest<string>;
+
+            namespace Uozturk.Mediator.ApiExplorer.Generated
+            {
+                public partial class AppCatalogServiceController
+                {
+                    public const string ExtendedByConsumer = "yes";
+                }
+            }
             """;
 
-        var execution = GeneratorTestHarness.Run(source, "/api/custom");
+        var execution = GeneratorTestHarness.Run(
+            source,
+            "/api/custom",
+            "App",
+            "Service");
         var generated = GeneratorTestHarness.GetGeneratedSource(execution);
 
         Assert.Contains(
@@ -106,6 +124,20 @@ public class MediatorApiExplorerGeneratorTests
             "AllowAnonymousAttribute",
             generated,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "public partial class AppCatalogServiceController",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "RebuildCatalogAsync(",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "GetOrdersAsync(",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Single(
+            execution.RunResult.Results.SelectMany(result => result.GeneratedSources));
         GeneratorTestHarness.AssertNoCompilationErrors(execution);
     }
 
@@ -135,6 +167,9 @@ public class MediatorApiExplorerGeneratorTests
                 AuthorizationPolicy = "Books.Read",
                 AllowAnonymous = true)]
             public sealed record GetAuthorsRequest : IRequest<string>;
+
+            [MediatorApiExplorer(ControllerName = "Invalid Name")]
+            public sealed record GetPublishersRequest : IRequest<string>;
             """;
 
         var execution = GeneratorTestHarness.Run(source);
@@ -146,10 +181,11 @@ public class MediatorApiExplorerGeneratorTests
         Assert.Contains("UOMA003", diagnosticIds);
         Assert.Contains("UOMA004", diagnosticIds);
         Assert.Contains("UOMA005", diagnosticIds);
+        Assert.Contains("UOMA007", diagnosticIds);
     }
 
     [Fact]
-    public void Should_Keep_Same_Simple_Type_Names_Unique_By_Namespace()
+    public void Should_Group_Same_Controller_Name_And_Keep_Overloaded_Actions_Valid()
     {
         const string source = """
             using Uozturk.Mediator.ApiExplorer;
@@ -169,12 +205,24 @@ public class MediatorApiExplorerGeneratorTests
             """;
 
         var execution = GeneratorTestHarness.Run(source);
-        var hintNames = execution.RunResult.Results
+        var generatedSources = execution.RunResult.Results
             .SelectMany(result => result.GeneratedSources)
-            .Select(source => source.HintName)
             .ToArray();
+        var generated = GeneratorTestHarness.GetGeneratedSource(execution);
 
-        Assert.Equal(2, hintNames.Distinct(StringComparer.Ordinal).Count());
+        Assert.Single(generatedSources);
+        Assert.Contains(
+            "public partial class PingController",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::First.PingRequest request",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Second.PingRequest request",
+            generated,
+            StringComparison.Ordinal);
         GeneratorTestHarness.AssertNoCompilationErrors(execution);
     }
 }

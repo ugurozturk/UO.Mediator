@@ -1,9 +1,13 @@
 <Project>
   <PropertyGroup>
     <UozturkMediatorApiRootPath Condition="'$(UozturkMediatorApiRootPath)' == ''">/api/app</UozturkMediatorApiRootPath>
+    <UozturkMediatorControllerPrefix Condition="'$(UozturkMediatorControllerPrefix)' == ''"></UozturkMediatorControllerPrefix>
+    <UozturkMediatorControllerSuffix Condition="'$(UozturkMediatorControllerSuffix)' == ''"></UozturkMediatorControllerSuffix>
   </PropertyGroup>
 
   <ItemGroup>
     <CompilerVisibleProperty Include="UozturkMediatorApiRootPath" />
+    <CompilerVisibleProperty Include="UozturkMediatorControllerPrefix" />
+    <CompilerVisibleProperty Include="UozturkMediatorControllerSuffix" />
   </ItemGroup>
 </Project>

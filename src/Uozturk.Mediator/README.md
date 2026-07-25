@@ -164,3 +164,11 @@ contracts.
   reflection is not used per dispatch.
 - The package does not replace unit of work, authorization or feature management boundaries.
   Keep those concerns in the consuming framework or inside handlers as appropriate.
+
+## ASP.NET Core API generation
+
+Install the companion `Uozturk.Mediator.ApiExplorer` analyzer package in an
+ASP.NET Core API host to generate controllers at compile time for requests
+marked with `MediatorApiExplorerAttribute`. Requests can be grouped into a
+stable, extensible partial controller with `ControllerName`; no runtime
+reflection is used.
