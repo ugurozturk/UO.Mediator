@@ -17,7 +17,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageId>UO.Mediator.ApiExplorer</PackageId>
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <Authors>UO</Authors>
     <Company>UO</Company>
     <Description>Compile-time ASP.NET Core controller generator for UO.Mediator requests.</Description>
