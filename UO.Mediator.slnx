@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/UO.Mediator.Shared/UO.Mediator.Shared.csproj" />
     <Project Path="src/UO.Mediator/UO.Mediator.csproj" />
     <Project Path="src/UO.Mediator.ApiExplorer/UO.Mediator.ApiExplorer.csproj" />
   </Folder>

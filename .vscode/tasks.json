@@ -16,7 +16,7 @@
         {
             "label": "pack-release",
             "type": "shell",
-            "command": "dotnet pack src/UO.Mediator/UO.Mediator.csproj -c Release && dotnet pack src/UO.Mediator.ApiExplorer/UO.Mediator.ApiExplorer.csproj -c Release",
+            "command": "dotnet pack src/UO.Mediator/UO.Mediator.csproj -c Release && dotnet pack src/UO.Mediator.ApiExplorer/UO.Mediator.ApiExplorer.csproj -c Release && dotnet pack src/UO.Mediator.Shared/UO.Mediator.Shared.csproj -c Release",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
