@@ -53,6 +53,7 @@ internal sealed class RequestPipelineCache
 }
 
 internal sealed class RequestPipeline<TRequest, TResponse, THandler>
+    : IRequestPipelineInvoker<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
     private readonly PipelineBehavior[] _behaviors;
@@ -105,9 +106,25 @@ internal sealed class RequestPipeline<TRequest, TResponse, THandler>
         }
 
         var behavior = behaviors[_behaviors[position].ServiceIndex];
+        var next = new RequestHandlerNext<TRequest, TResponse>(
+            this,
+            request,
+            handler!,
+            behaviors,
+            position + 1);
+
         return behavior.HandleAsync(
             request,
-            () => ExecuteBehaviorAsync(position + 1, request, handler, behaviors));
+            next);
+    }
+
+    Task<TResponse> IRequestPipelineInvoker<TRequest, TResponse>.InvokeAsync(
+        int position,
+        TRequest request,
+        object handler,
+        IReadOnlyList<IRequestBehavior<TRequest, TResponse>> behaviors)
+    {
+        return ExecuteBehaviorAsync(position, request, (THandler)handler, behaviors);
     }
 
     private readonly record struct PipelineBehavior(Type BehaviorType, int ServiceIndex);

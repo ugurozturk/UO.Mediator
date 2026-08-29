@@ -319,10 +319,10 @@ public sealed class SingleBehaviorCommandBehavior : IRequestBehavior<SingleBehav
 {
     public Task<Unit> HandleAsync(
         SingleBehaviorCommand request,
-        RequestHandlerDelegate<Unit> next)
+        RequestHandlerNext<SingleBehaviorCommand, Unit> next)
     {
         request.Trace.Add("behavior");
-        return next();
+        return next.InvokeAsync();
     }
 }
 
@@ -343,10 +343,10 @@ public sealed class FirstOrderedBehavior : IRequestBehavior<OrderedRequest, Unit
 
     public async Task<Unit> HandleAsync(
         OrderedRequest request,
-        RequestHandlerDelegate<Unit> next)
+        RequestHandlerNext<OrderedRequest, Unit> next)
     {
         request.Trace.Add("first-before");
-        var result = await next();
+        var result = await next.InvokeAsync();
         request.Trace.Add("first-after");
         return result;
     }
@@ -358,10 +358,10 @@ public sealed class SecondOrderedBehavior : IRequestBehavior<OrderedRequest, Uni
 
     public async Task<Unit> HandleAsync(
         OrderedRequest request,
-        RequestHandlerDelegate<Unit> next)
+        RequestHandlerNext<OrderedRequest, Unit> next)
     {
         request.Trace.Add("second-before");
-        var result = await next();
+        var result = await next.InvokeAsync();
         request.Trace.Add("second-after");
         return result;
     }
@@ -386,10 +386,10 @@ public sealed class PreparedPipelineBehavior(PreparedPipelineProbe probe)
 
     public Task<string> HandleAsync(
         PreparedPipelineRequest request,
-        RequestHandlerDelegate<string> next)
+        RequestHandlerNext<PreparedPipelineRequest, string> next)
     {
         request.BehaviorInstances.Add(_instanceId);
-        return next();
+        return next.InvokeAsync();
     }
 }
 

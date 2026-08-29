@@ -21,7 +21,7 @@ public partial class RequestLoggingBehavior<TRequest, TResponse>(
     /// <inheritdoc />
     public async Task<TResponse> HandleAsync(
         TRequest request,
-        RequestHandlerDelegate<TResponse> next)
+        RequestHandlerNext<TRequest, TResponse> next)
     {
         var requestName = typeof(TRequest).Name;
         var startTimestamp = Stopwatch.GetTimestamp();
@@ -29,7 +29,7 @@ public partial class RequestLoggingBehavior<TRequest, TResponse>(
         LogDispatching(_logger, requestName);
         try
         {
-            return await next();
+            return await next.InvokeAsync();
         }
         finally
         {

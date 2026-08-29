@@ -49,10 +49,10 @@ changing the production dispatcher or pipeline implementation:
   `5` transient behaviors and `1`, `3`, and `5` singleton behaviors. This isolates
   DI resolution, lifetime-specific construction, and collection materialization.
 - `UODirectBehaviorInvocationBenchmarks` uses fixed empty behavior instances and a
-  manually wired public `RequestHandlerDelegate<TResponse>` chain. The delegates are
-  constructed once during setup, so this is a lower-bound baseline for nested
-  behavior/delegate invocation without DI, dispatcher lookup, or per-call
-  continuation construction.
+  manually wired benchmark-local delegate chain matching the former captured
+  pipeline. The delegates are constructed once during setup, so this is a lower-bound
+  baseline for nested behavior/delegate invocation without DI, dispatcher lookup, or
+  per-call continuation construction.
 - `UODirectHandlerBaselineBenchmarks` compares the existing synchronously completed
   `Task` handler directly with a warmed zero-behavior UO.Mediator dispatch using that
   same handler instance. The difference estimates base dispatcher and DI lookup
@@ -69,7 +69,8 @@ changing the production dispatcher or pipeline implementation:
 Transient and singleton behavior results measure different Microsoft DI lifetime
 costs and should not be treated as interchangeable pipeline results. Raw DI
 resolution is reported separately so it can be distinguished from continuation
-costs. No production optimization or refactoring is applied by these benchmarks.
+costs. The prototype groups remain benchmark-only comparisons; the production
+dispatcher now uses the readonly struct continuation architecture.
 
 Run the full benchmark from the repository root:
 

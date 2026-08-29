@@ -13,19 +13,19 @@ public class UODirectBehaviorInvocationBenchmarks
 {
     private readonly BehaviorPipelineRequest _request = new(42);
     private readonly BehaviorPipelineRequestHandler _handler = new();
-    private readonly EmptyBehavior<BehaviorPipelineRequest, int> _firstBehavior = new();
-    private readonly EmptyBehavior<BehaviorPipelineRequest, int> _secondBehavior = new();
-    private readonly EmptyBehavior<BehaviorPipelineRequest, int> _thirdBehavior = new();
-    private readonly EmptyBehavior<BehaviorPipelineRequest, int> _fourthBehavior = new();
-    private readonly EmptyBehavior<BehaviorPipelineRequest, int> _fifthBehavior = new();
+    private readonly DirectEmptyBehavior _firstBehavior = new();
+    private readonly DirectEmptyBehavior _secondBehavior = new();
+    private readonly DirectEmptyBehavior _thirdBehavior = new();
+    private readonly DirectEmptyBehavior _fourthBehavior = new();
+    private readonly DirectEmptyBehavior _fifthBehavior = new();
 
-    private RequestHandlerDelegate<int> _handlerContinuation = null!;
-    private RequestHandlerDelegate<int> _secondOfThreeContinuation = null!;
-    private RequestHandlerDelegate<int> _thirdOfThreeContinuation = null!;
-    private RequestHandlerDelegate<int> _secondOfFiveContinuation = null!;
-    private RequestHandlerDelegate<int> _thirdOfFiveContinuation = null!;
-    private RequestHandlerDelegate<int> _fourthOfFiveContinuation = null!;
-    private RequestHandlerDelegate<int> _fifthOfFiveContinuation = null!;
+    private PrototypeRequestHandlerDelegate<int> _handlerContinuation = null!;
+    private PrototypeRequestHandlerDelegate<int> _secondOfThreeContinuation = null!;
+    private PrototypeRequestHandlerDelegate<int> _thirdOfThreeContinuation = null!;
+    private PrototypeRequestHandlerDelegate<int> _secondOfFiveContinuation = null!;
+    private PrototypeRequestHandlerDelegate<int> _thirdOfFiveContinuation = null!;
+    private PrototypeRequestHandlerDelegate<int> _fourthOfFiveContinuation = null!;
+    private PrototypeRequestHandlerDelegate<int> _fifthOfFiveContinuation = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -76,5 +76,15 @@ public class UODirectBehaviorInvocationBenchmarks
     public Task<int> DirectFiveBehaviors()
     {
         return _firstBehavior.HandleAsync(_request, _secondOfFiveContinuation);
+    }
+
+    private sealed class DirectEmptyBehavior
+    {
+        public Task<int> HandleAsync(
+            BehaviorPipelineRequest request,
+            PrototypeRequestHandlerDelegate<int> next)
+        {
+            return next();
+        }
     }
 }

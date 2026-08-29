@@ -82,10 +82,16 @@ services.AddUOMediator(typeof(GetOrderHandler).Assembly);
 - `IRequestHandler<TRequest>` and
   `IRequestHandler<TRequest, TResponse>`
 - `IRequestBehavior<TRequest, TResponse>`
-- `RequestHandlerDelegate<TResponse>`
+- `RequestHandlerNext<TRequest, TResponse>`
 - `IRequestDispatcher`
 - `RequestDispatcherOptions`
 - `Unit`
+
+`IRequestBehavior<TRequest, TResponse>` is invariant in `TRequest`. Behavior
+implementations receive the immutable readonly struct continuation and invoke the
+downstream pipeline with `next.InvokeAsync()`. This is an intentional breaking change
+from the former contravariant delegate-based behavior contract, made to avoid a
+captured delegate allocation at every behavior stage.
 
 This package provides contracts only. It does not scan assemblies, register
 handlers, validate the request graph or dispatch requests. Those runtime

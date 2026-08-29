@@ -156,7 +156,7 @@ public class UOPipelineContinuationPrototypeBenchmarks
     {
         Task<int> HandleAsync(
             PrototypeRequest request,
-            RequestHandlerDelegate<int> next);
+            PrototypeRequestHandlerDelegate<int> next);
 
         Task<int> HandleAsync(
             PrototypeRequest request,
@@ -171,7 +171,7 @@ public class UOPipelineContinuationPrototypeBenchmarks
     {
         public Task<int> HandleAsync(
             PrototypeRequest request,
-            RequestHandlerDelegate<int> next)
+            PrototypeRequestHandlerDelegate<int> next)
         {
             return next();
         }

@@ -231,7 +231,7 @@ internal interface ICachedGraphPrototypeBehavior
 {
     Task<int> HandleAsync(
         CachedGraphPrototypeRequest request,
-        RequestHandlerDelegate<int> next);
+        PrototypeRequestHandlerDelegate<int> next);
 
     Task<int> HandleAsync(
         CachedGraphPrototypeRequest request,
@@ -246,7 +246,7 @@ internal sealed class CachedGraphPrototypeBehavior : ICachedGraphPrototypeBehavi
 {
     public Task<int> HandleAsync(
         CachedGraphPrototypeRequest request,
-        RequestHandlerDelegate<int> next)
+        PrototypeRequestHandlerDelegate<int> next)
     {
         return next();
     }
@@ -695,7 +695,7 @@ internal sealed class DoubleInvokeCachedGraphPrototypeBehavior : ICachedGraphPro
 {
     public Task<int> HandleAsync(
         CachedGraphPrototypeRequest request,
-        RequestHandlerDelegate<int> next)
+        PrototypeRequestHandlerDelegate<int> next)
     {
         throw new NotSupportedException("This validation behavior is cached-graph-only.");
     }

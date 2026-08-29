@@ -108,14 +108,34 @@ public sealed class ValidationBehavior<TRequest, TResponse>
 
     public async Task<TResponse> HandleAsync(
         TRequest request,
-        RequestHandlerDelegate<TResponse> next)
+        RequestHandlerNext<TRequest, TResponse> next)
     {
         // before handler
-        var response = await next();
+        var response = await next.InvokeAsync();
         // after handler
         return response;
     }
 }
+```
+
+`RequestHandlerNext<TRequest, TResponse>` is an immutable readonly struct. This is
+a breaking behavior API change from `RequestHandlerDelegate<TResponse>` and removes
+the captured delegate allocation previously created for every behavior stage.
+`IRequestBehavior<TRequest, TResponse>` is now invariant in `TRequest` so the
+continuation can keep the request strongly typed without boxing or a hot-path adapter.
+
+Migrate existing behavior methods by replacing the delegate parameter and invocation:
+
+```csharp
+// Before
+Task<TResponse> HandleAsync(
+    TRequest request,
+    RequestHandlerDelegate<TResponse> next) => next();
+
+// After
+Task<TResponse> HandleAsync(
+    TRequest request,
+    RequestHandlerNext<TRequest, TResponse> next) => next.InvokeAsync();
 ```
 
 The built-in `RequestLoggingBehavior` runs at `Order = int.MinValue` and logs request

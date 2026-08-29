@@ -1,5 +1,8 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+
+[assembly: InternalsVisibleTo("UO.Mediator")]
 
 namespace UO.Mediator.Dispatching;
 
@@ -66,17 +69,73 @@ public interface IRequestHandler<in TRequest> : IRequestHandler<TRequest, Unit>
 }
 
 /// <summary>
-/// Delegate that represents the next stage in the dispatch pipeline.
+/// Immutable continuation for the next stage in a request behavior pipeline.
 /// </summary>
+/// <typeparam name="TRequest">The request type.</typeparam>
 /// <typeparam name="TResponse">The response type.</typeparam>
-public delegate Task<TResponse> RequestHandlerDelegate<TResponse>();
+/// <remarks>
+/// UO.Mediator creates this value for each downstream pipeline position. Calling
+/// <see cref="InvokeAsync"/> more than once starts execution from that same position
+/// each time.
+/// </remarks>
+public readonly struct RequestHandlerNext<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    private readonly IRequestPipelineInvoker<TRequest, TResponse>? _pipeline;
+    private readonly TRequest _request;
+    private readonly object? _handler;
+    private readonly IReadOnlyList<IRequestBehavior<TRequest, TResponse>>? _behaviors;
+    private readonly int _position;
+
+    internal RequestHandlerNext(
+        IRequestPipelineInvoker<TRequest, TResponse> pipeline,
+        TRequest request,
+        object handler,
+        IReadOnlyList<IRequestBehavior<TRequest, TResponse>> behaviors,
+        int position)
+    {
+        _pipeline = pipeline;
+        _request = request;
+        _handler = handler;
+        _behaviors = behaviors;
+        _position = position;
+    }
+
+    /// <summary>
+    /// Executes the downstream pipeline from this continuation's fixed position.
+    /// </summary>
+    public Task<TResponse> InvokeAsync()
+    {
+        if (_pipeline is null || _handler is null || _behaviors is null)
+        {
+            throw new InvalidOperationException(
+                "The continuation must be created by UO.Mediator before it can be invoked.");
+        }
+
+        return _pipeline.InvokeAsync(
+            _position,
+            _request,
+            _handler,
+            _behaviors);
+    }
+}
+
+internal interface IRequestPipelineInvoker<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    Task<TResponse> InvokeAsync(
+        int position,
+        TRequest request,
+        object handler,
+        IReadOnlyList<IRequestBehavior<TRequest, TResponse>> behaviors);
+}
 
 /// <summary>
 /// Cross-cutting concern that wraps a request dispatch.
 /// </summary>
 /// <typeparam name="TRequest">The request type.</typeparam>
 /// <typeparam name="TResponse">The response type.</typeparam>
-public interface IRequestBehavior<in TRequest, TResponse>
+public interface IRequestBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
     /// <summary>
@@ -89,7 +148,7 @@ public interface IRequestBehavior<in TRequest, TResponse>
     /// </summary>
     Task<TResponse> HandleAsync(
         TRequest request,
-        RequestHandlerDelegate<TResponse> next);
+        RequestHandlerNext<TRequest, TResponse> next);
 }
 
 /// <summary>

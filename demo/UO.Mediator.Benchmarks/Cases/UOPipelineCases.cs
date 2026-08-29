@@ -17,9 +17,9 @@ public sealed class EmptyBehavior<TRequest, TResponse> : IRequestBehavior<TReque
 {
     public Task<TResponse> HandleAsync(
         TRequest request,
-        RequestHandlerDelegate<TResponse> next)
+        RequestHandlerNext<TRequest, TResponse> next)
     {
-        return next();
+        return next.InvokeAsync();
     }
 }
 
