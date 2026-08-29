@@ -5,6 +5,7 @@
     <Project Path="src/UO.Mediator.ApiExplorer/UO.Mediator.ApiExplorer.csproj" />
   </Folder>
   <Folder Name="/demo/">
+    <Project Path="demo/UO.Mediator.Benchmarks/UO.Mediator.Benchmarks.csproj" />
     <Project Path="demo/UO.Mediator.Demo/UO.Mediator.Demo.csproj" />
   </Folder>
   <Folder Name="/test/">
