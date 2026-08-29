@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace UO.Mediator.ApiExplorer.Tests;
@@ -223,6 +225,102 @@ public class MediatorApiExplorerGeneratorTests
             StringComparison.Ordinal);
         Assert.Single(
             execution.RunResult.Results.SelectMany(result => result.GeneratedSources));
+        GeneratorTestHarness.AssertNoCompilationErrors(execution);
+    }
+
+    [Fact]
+    public void Should_Copy_Request_Attributes_From_Referenced_Assembly_To_Action()
+    {
+        const string requestSource = """
+            using System;
+            using UO.Mediator.ApiExplorer;
+            using UO.Mediator.Dispatching;
+
+            namespace Contracts;
+
+            public enum MetadataLevel
+            {
+                Low = 1,
+                High = 2
+            }
+
+            [AttributeUsage(
+                AttributeTargets.Class | AttributeTargets.Method,
+                AllowMultiple = true)]
+            public sealed class EndpointMetadataAttribute : Attribute
+            {
+                public EndpointMetadataAttribute(
+                    string name,
+                    Type responseType,
+                    MetadataLevel level,
+                    int[] codes)
+                {
+                }
+
+                public bool Enabled { get; set; }
+
+                public char Separator { get; set; }
+            }
+
+            public sealed class DefaultMetadataAttribute : Attribute;
+
+            [AttributeUsage(AttributeTargets.Class)]
+            public sealed class ClassOnlyMetadataAttribute : Attribute;
+
+            [MediatorApiExplorer(ControllerName = "Book")]
+            [EndpointMetadata(
+                "books\napi",
+                typeof(string),
+                MetadataLevel.High,
+                new[] { 1, 2 },
+                Enabled = true,
+                Separator = '|')]
+            [DefaultMetadata]
+            [ClassOnlyMetadata]
+            public sealed record GetBookRequest : IRequest<string>;
+            """;
+
+        var requestReference = GeneratorTestHarness.CompileReference(
+            requestSource,
+            "ContractsWithMetadata");
+        var execution = GeneratorTestHarness.Run(
+            "public sealed class ApiHostMarker { }",
+            additionalReferences: requestReference);
+        var generated = GeneratorTestHarness.GetGeneratedSource(execution);
+        var root = CSharpSyntaxTree.ParseText(generated).GetRoot();
+        var controller = Assert.Single(
+            root.DescendantNodes().OfType<ClassDeclarationSyntax>());
+        var action = Assert.Single(
+            controller.Members.OfType<MethodDeclarationSyntax>());
+        var controllerAttributes = controller.AttributeLists
+            .SelectMany(list => list.Attributes)
+            .Select(attribute => attribute.Name.ToString())
+            .ToArray();
+        var actionAttributes = action.AttributeLists
+            .SelectMany(list => list.Attributes)
+            .Select(attribute => attribute.Name.ToString())
+            .ToArray();
+
+        Assert.DoesNotContain(
+            controllerAttributes,
+            name => name.Contains("EndpointMetadataAttribute", StringComparison.Ordinal));
+        Assert.Contains(
+            actionAttributes,
+            name => name.Contains("EndpointMetadataAttribute", StringComparison.Ordinal));
+        Assert.Contains(
+            actionAttributes,
+            name => name.Contains("DefaultMetadataAttribute", StringComparison.Ordinal));
+        Assert.DoesNotContain("ClassOnlyMetadataAttribute", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("MediatorApiExplorerAttribute", generated, StringComparison.Ordinal);
+        Assert.Contains("\"books\\napi\"", generated, StringComparison.Ordinal);
+        Assert.Contains("typeof(string)", generated, StringComparison.Ordinal);
+        Assert.Contains(
+            "(global::Contracts.MetadataLevel)2",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains("new int[] { 1, 2 }", generated, StringComparison.Ordinal);
+        Assert.Contains("Enabled = true", generated, StringComparison.Ordinal);
+        Assert.Contains("Separator = '|'", generated, StringComparison.Ordinal);
         GeneratorTestHarness.AssertNoCompilationErrors(execution);
     }
 

@@ -13,6 +13,10 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
 {
     private const string AttributeMetadataName =
         "UO.Mediator.ApiExplorer.MediatorApiExplorerAttribute";
+    private const string AttributeUsageMetadataName =
+        "System.AttributeUsageAttribute";
+    private const string AllowAnonymousAttributeMetadataName =
+        "Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute";
     private const string GenericRequestMetadataName =
         "UO.Mediator.Dispatching.IRequest`1";
     private const string UnitMetadataName =
@@ -612,6 +616,10 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         }
 
         var responseType = responseTypes[0];
+        var actionAttributes = GetActionAttributes(
+            requestType,
+            attributeType,
+            settings.AllowAnonymous);
         return new EndpointModel(
             requestType,
             requestName,
@@ -624,7 +632,265 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             controllerGroupName,
             settings.AuthorizationPolicy,
             settings.AllowAnonymous,
+            actionAttributes,
             location);
+    }
+
+    private static IReadOnlyList<string> GetActionAttributes(
+        INamedTypeSymbol requestType,
+        INamedTypeSymbol explorerAttributeType,
+        bool allowAnonymous)
+    {
+        var attributes = new List<string>();
+
+        foreach (var attribute in requestType.GetAttributes())
+        {
+            if (attribute.AttributeClass is null ||
+                SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass,
+                    explorerAttributeType) ||
+                (allowAnonymous &&
+                 HasMetadataName(
+                     attribute.AttributeClass,
+                     AllowAnonymousAttributeMetadataName)) ||
+                IsCompilerServicesAttribute(attribute.AttributeClass) ||
+                !CanTargetMethod(attribute.AttributeClass))
+            {
+                continue;
+            }
+
+            if (TryRenderAttribute(attribute, out var renderedAttribute))
+            {
+                attributes.Add(renderedAttribute);
+            }
+        }
+
+        return attributes;
+    }
+
+    private static bool IsCompilerServicesAttribute(INamedTypeSymbol attributeType)
+    {
+        return string.Equals(
+            attributeType.ContainingNamespace?.ToDisplayString(),
+            "System.Runtime.CompilerServices",
+            StringComparison.Ordinal);
+    }
+
+    private static bool CanTargetMethod(INamedTypeSymbol attributeType)
+    {
+        for (var current = attributeType;
+             current is not null;
+             current = current.BaseType)
+        {
+            var usage = current.GetAttributes().FirstOrDefault(attribute =>
+                attribute.AttributeClass is not null &&
+                HasMetadataName(
+                    attribute.AttributeClass,
+                    AttributeUsageMetadataName));
+            if (usage is null)
+            {
+                continue;
+            }
+
+            if (usage.ConstructorArguments.Length == 0 ||
+                usage.ConstructorArguments[0].Value is null)
+            {
+                return true;
+            }
+
+            var targets = Convert.ToInt64(
+                usage.ConstructorArguments[0].Value,
+                CultureInfo.InvariantCulture);
+            return (targets & (long)AttributeTargets.Method) != 0;
+        }
+
+        // AttributeUsage defaults to AttributeTargets.All.
+        return true;
+    }
+
+    private static bool HasMetadataName(
+        INamedTypeSymbol type,
+        string metadataName)
+    {
+        return string.Equals(
+            type.ToDisplayString(),
+            metadataName,
+            StringComparison.Ordinal);
+    }
+
+    private static bool TryRenderAttribute(
+        AttributeData attribute,
+        out string renderedAttribute)
+    {
+        if (attribute.AttributeClass is null)
+        {
+            renderedAttribute = string.Empty;
+            return false;
+        }
+
+        var arguments = new List<string>(
+            attribute.ConstructorArguments.Length + attribute.NamedArguments.Length);
+        foreach (var argument in attribute.ConstructorArguments)
+        {
+            if (!TryRenderTypedConstant(argument, out var renderedArgument))
+            {
+                renderedAttribute = string.Empty;
+                return false;
+            }
+
+            arguments.Add(renderedArgument);
+        }
+
+        foreach (var argument in attribute.NamedArguments)
+        {
+            if (!TryRenderTypedConstant(argument.Value, out var renderedArgument))
+            {
+                renderedAttribute = string.Empty;
+                return false;
+            }
+
+            arguments.Add(argument.Key + " = " + renderedArgument);
+        }
+
+        var builder = new StringBuilder();
+        builder.Append('[')
+            .Append(attribute.AttributeClass.ToDisplayString(FullyQualifiedTypeFormat));
+        if (arguments.Count > 0)
+        {
+            builder.Append('(')
+                .Append(string.Join(", ", arguments))
+                .Append(')');
+        }
+
+        builder.Append(']');
+        renderedAttribute = builder.ToString();
+        return true;
+    }
+
+    private static bool TryRenderTypedConstant(
+        TypedConstant constant,
+        out string renderedConstant)
+    {
+        if (constant.Kind == TypedConstantKind.Error)
+        {
+            renderedConstant = string.Empty;
+            return false;
+        }
+
+        if (constant.IsNull)
+        {
+            renderedConstant = "null";
+            return true;
+        }
+
+        if (constant.Kind == TypedConstantKind.Array)
+        {
+            if (constant.Type is null)
+            {
+                renderedConstant = string.Empty;
+                return false;
+            }
+
+            var elements = new List<string>(constant.Values.Length);
+            foreach (var element in constant.Values)
+            {
+                if (!TryRenderTypedConstant(element, out var renderedElement))
+                {
+                    renderedConstant = string.Empty;
+                    return false;
+                }
+
+                elements.Add(renderedElement);
+            }
+
+            renderedConstant = "new " +
+                               constant.Type.ToDisplayString(FullyQualifiedTypeFormat) +
+                               " { " +
+                               string.Join(", ", elements) +
+                               " }";
+            return true;
+        }
+
+        if (constant.Kind == TypedConstantKind.Type &&
+            constant.Value is ITypeSymbol typeValue)
+        {
+            renderedConstant = "typeof(" +
+                               typeValue.ToDisplayString(FullyQualifiedTypeFormat) +
+                               ")";
+            return true;
+        }
+
+        if (constant.Kind == TypedConstantKind.Enum && constant.Type is not null)
+        {
+            renderedConstant = "(" +
+                               constant.Type.ToDisplayString(FullyQualifiedTypeFormat) +
+                               ")" +
+                               RenderPrimitive(constant.Value);
+            return true;
+        }
+
+        renderedConstant = RenderPrimitive(constant.Value);
+        return true;
+    }
+
+    private static string RenderPrimitive(object? value)
+    {
+        switch (value)
+        {
+            case null:
+                return "null";
+            case string stringValue:
+                return "\"" + EscapeCSharpString(stringValue) + "\"";
+            case char charValue:
+                return "'" + EscapeCSharpChar(charValue) + "'";
+            case bool boolValue:
+                return boolValue ? "true" : "false";
+            case uint uintValue:
+                return uintValue.ToString(CultureInfo.InvariantCulture) + "U";
+            case long longValue:
+                return longValue.ToString(CultureInfo.InvariantCulture) + "L";
+            case ulong ulongValue:
+                return ulongValue.ToString(CultureInfo.InvariantCulture) + "UL";
+            case float floatValue when float.IsNaN(floatValue):
+                return "global::System.Single.NaN";
+            case float floatValue when float.IsPositiveInfinity(floatValue):
+                return "global::System.Single.PositiveInfinity";
+            case float floatValue when float.IsNegativeInfinity(floatValue):
+                return "global::System.Single.NegativeInfinity";
+            case float floatValue:
+                return floatValue.ToString("R", CultureInfo.InvariantCulture) + "F";
+            case double doubleValue when double.IsNaN(doubleValue):
+                return "global::System.Double.NaN";
+            case double doubleValue when double.IsPositiveInfinity(doubleValue):
+                return "global::System.Double.PositiveInfinity";
+            case double doubleValue when double.IsNegativeInfinity(doubleValue):
+                return "global::System.Double.NegativeInfinity";
+            case double doubleValue:
+                return doubleValue.ToString("R", CultureInfo.InvariantCulture) + "D";
+            default:
+                return Convert.ToString(value, CultureInfo.InvariantCulture) ?? "null";
+        }
+    }
+
+    private static string EscapeCSharpChar(char value)
+    {
+        switch (value)
+        {
+            case '\\': return "\\\\";
+            case '\'': return "\\'";
+            case '\0': return "\\0";
+            case '\a': return "\\a";
+            case '\b': return "\\b";
+            case '\f': return "\\f";
+            case '\n': return "\\n";
+            case '\r': return "\\r";
+            case '\t': return "\\t";
+            case '\v': return "\\v";
+            default:
+                return char.IsControl(value)
+                    ? "\\u" + ((int)value).ToString("X4", CultureInfo.InvariantCulture)
+                    : value.ToString();
+        }
     }
 
     private static void ReportInvalidRequest(
@@ -1018,6 +1284,12 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
                 .AppendLine("\")]");
         }
 
+        foreach (var attribute in endpoint.ActionAttributes)
+        {
+            builder.Append("        ")
+                .AppendLine(attribute);
+        }
+
         builder.Append("        [global::Microsoft.AspNetCore.Mvc.")
             .Append(httpAttribute)
             .Append("(\"")
@@ -1067,11 +1339,39 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
 
     private static string EscapeCSharpString(string value)
     {
-        return value
-            .Replace("\\", "\\\\")
-            .Replace("\"", "\\\"")
-            .Replace("\r", "\\r")
-            .Replace("\n", "\\n");
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value)
+        {
+            switch (character)
+            {
+                case '\\': builder.Append("\\\\"); break;
+                case '\"': builder.Append("\\\""); break;
+                case '\0': builder.Append("\\0"); break;
+                case '\a': builder.Append("\\a"); break;
+                case '\b': builder.Append("\\b"); break;
+                case '\f': builder.Append("\\f"); break;
+                case '\n': builder.Append("\\n"); break;
+                case '\r': builder.Append("\\r"); break;
+                case '\t': builder.Append("\\t"); break;
+                case '\v': builder.Append("\\v"); break;
+                default:
+                    if (char.IsControl(character))
+                    {
+                        builder.Append("\\u")
+                            .Append(((int)character).ToString(
+                                "X4",
+                                CultureInfo.InvariantCulture));
+                    }
+                    else
+                    {
+                        builder.Append(character);
+                    }
+
+                    break;
+            }
+        }
+
+        return builder.ToString();
     }
 
     private static bool TryValidateControllerFragment(
@@ -1128,6 +1428,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             string tag,
             string? authorizationPolicy,
             bool allowAnonymous,
+            IReadOnlyList<string> actionAttributes,
             Location location)
         {
             RequestType = requestType;
@@ -1141,6 +1442,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             Tag = tag;
             AuthorizationPolicy = authorizationPolicy;
             AllowAnonymous = allowAnonymous;
+            ActionAttributes = actionAttributes;
             Location = location;
         }
 
@@ -1165,6 +1467,8 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         public string? AuthorizationPolicy { get; }
 
         public bool AllowAnonymous { get; }
+
+        public IReadOnlyList<string> ActionAttributes { get; }
 
         public Location Location { get; }
     }

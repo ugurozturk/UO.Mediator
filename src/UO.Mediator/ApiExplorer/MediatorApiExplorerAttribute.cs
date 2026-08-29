@@ -24,12 +24,12 @@ public sealed class MediatorApiExplorerAttribute : Attribute
     public MediatorHttpMethod HttpMethod { get; set; } = MediatorHttpMethod.Convention;
 
     /// <summary>
-    /// Adds an ASP.NET Core authorization policy to the generated controller.
+    /// Adds an ASP.NET Core authorization policy to the generated action.
     /// </summary>
     public string? AuthorizationPolicy { get; set; }
 
     /// <summary>
-    /// Marks the generated controller as allowing anonymous access.
+    /// Marks the generated action as allowing anonymous access.
     /// </summary>
     public bool AllowAnonymous { get; set; }
 }

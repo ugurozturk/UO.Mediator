@@ -50,7 +50,11 @@ public sealed record GetListBooksRequest : IRequest<IReadOnlyList<Book>>;
 [MediatorApiExplorer(ControllerName = "Book")]
 public sealed record GetBookRequest(Guid Id) : IRequest<Book?>;
 
+// This metadata is copied to the generated CreateBookAsync action.
 [MediatorApiExplorer(ControllerName = "Book")]
+[DemoActionMetadata(
+    "books.create",
+    Description = "Copied from CreateBookRequest to CreateBookAsync.")]
 public sealed record CreateBookRequest(string Title, string Author) : IRequest<Book>;
 
 [MediatorApiExplorer(ControllerName = "Book")]

@@ -102,6 +102,21 @@ Set `AllowAnonymous = true` for a public endpoint. It cannot be combined with
 `AuthorizationPolicy`. If neither option is specified, the generated
 controller relies on the API host's global or fallback authorization policy.
 
+Other attributes applied directly to the request are copied to its generated
+action method when their `AttributeUsage` supports `AttributeTargets.Method`.
+Constructor arguments and named arguments are preserved. Attributes that only
+target classes are left on the request and are not emitted on the controller,
+and `MediatorApiExplorerAttribute` itself is never copied.
+
+```csharp
+[MediatorApiExplorer(ControllerName = "Catalog")]
+[MyEndpointMetadata("catalog", Enabled = true)]
+public sealed record RebuildCatalogRequest : IRequest;
+```
+
+Here, `MyEndpointMetadataAttribute` is emitted on `RebuildCatalogAsync`, not on
+the generated `CatalogController` class.
+
 Routes are absolute and static. Route parameters such as `{id}` are not
 supported in the first version.
 
