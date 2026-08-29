@@ -33,6 +33,36 @@ All UO.Mediator benchmarks warm the executor and pipeline caches during global s
 Each behavior and handler count is a separate benchmark method so BenchmarkDotNet
 reports ratios against the `0 behaviors` and `10 handlers` baselines.
 
+## Behavior Allocation Decomposition
+
+The following diagnostic groups decompose the warmed behavior-pipeline cost without
+changing the production dispatcher or pipeline implementation:
+
+- `UOBehaviorLifetimeBenchmarks` dispatches the same request to the same singleton
+  handler with `0`, `1`, `3`, or `5` empty behaviors. Transient and singleton
+  behavior registrations use separate service providers. Their difference isolates
+  transient behavior construction; both still include Microsoft DI collection
+  resolution and UO.Mediator pipeline invocation.
+- `UOBehaviorResolutionBenchmarks` calls Microsoft DI directly, without a dispatcher.
+  It reports both `GetServices<T>()` and the current UO.Mediator `ResolveBehaviors`
+  shape (`IReadOnlyList<T>` cast with a `ToArray()` fallback) for `0`, `1`, `3`, and
+  `5` transient behaviors and `1`, `3`, and `5` singleton behaviors. This isolates
+  DI resolution, lifetime-specific construction, and collection materialization.
+- `UODirectBehaviorInvocationBenchmarks` uses fixed empty behavior instances and a
+  manually wired public `RequestHandlerDelegate<TResponse>` chain. The delegates are
+  constructed once during setup, so this is a lower-bound baseline for nested
+  behavior/delegate invocation without DI, dispatcher lookup, or per-call
+  continuation construction.
+- `UODirectHandlerBaselineBenchmarks` compares the existing synchronously completed
+  `Task` handler directly with a warmed zero-behavior UO.Mediator dispatch using that
+  same handler instance. The difference estimates base dispatcher and DI lookup
+  overhead.
+
+Transient and singleton behavior results measure different Microsoft DI lifetime
+costs and should not be treated as interchangeable pipeline results. Raw DI
+resolution is reported separately so it can be distinguished from continuation
+costs. No production optimization or refactoring is applied by these benchmarks.
+
 Run the full benchmark from the repository root:
 
 ```bash
