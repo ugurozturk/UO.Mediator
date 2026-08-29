@@ -11,6 +11,11 @@ handler. Handlers use transient lifetime so the three dispatchers are compared
 under the same DI lifetime. The measured operation excludes container creation,
 mediator resolution, source generation, and first-call cache initialization.
 
+> **Important:** The benchmarks use each library's native handler contract.
+> martinothamar/Mediator uses `ValueTask`, while UO.Mediator and MediatR use
+> `Task`. This difference can affect the benchmark results and should be taken
+> into account when comparing the libraries.
+
 UO.Mediator is shown twice. `default logging` measures its public default, which
 always includes `RequestLoggingBehavior`. `core dispatch` removes that descriptor
 inside the benchmark setup to isolate dispatcher overhead; this is not currently
