@@ -37,6 +37,41 @@ public class RequestDispatcherTests
     }
 
     [Fact]
+    public async Task Should_Cache_Pipeline_Metadata_But_Resolve_Scoped_Behaviors_Per_Dispatch()
+    {
+        var probe = new PreparedPipelineProbe();
+        using var provider = BuildPreparedPipelineProvider(probe);
+        var firstTrace = new List<int>();
+        var secondTrace = new List<int>();
+
+        using (var scope = provider.CreateScope())
+        {
+            var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
+            await dispatcher.DispatchAsync(new PreparedPipelineRequest(firstTrace));
+        }
+
+        using (var scope = provider.CreateScope())
+        {
+            var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
+            await dispatcher.DispatchAsync(new PreparedPipelineRequest(secondTrace));
+        }
+
+        Assert.Equal(2, probe.CreatedCount);
+        Assert.Equal(1, probe.OrderReadCount);
+        Assert.NotEqual(Assert.Single(firstTrace), Assert.Single(secondTrace));
+
+        var otherProbe = new PreparedPipelineProbe();
+        using var otherProvider = BuildPreparedPipelineProvider(otherProbe);
+        using var otherScope = otherProvider.CreateScope();
+        var otherDispatcher = otherScope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
+
+        await otherDispatcher.DispatchAsync(new PreparedPipelineRequest([]));
+
+        Assert.Equal(1, otherProbe.CreatedCount);
+        Assert.Equal(1, otherProbe.OrderReadCount);
+    }
+
+    [Fact]
     public async Task Should_Propagate_Handler_Exceptions()
     {
         using var provider = BuildProvider();
@@ -120,6 +155,18 @@ public class RequestDispatcherTests
         services.AddUOMediator(typeof(RequestDispatcherTests).Assembly);
         return services.BuildServiceProvider(validateScopes: true);
     }
+
+    private static ServiceProvider BuildPreparedPipelineProvider(PreparedPipelineProbe probe)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(probe);
+        services.AddScoped<
+            IRequestBehavior<PreparedPipelineRequest, string>,
+            PreparedPipelineBehavior>();
+        services.AddUOMediator(typeof(RequestDispatcherTests).Assembly);
+        return services.BuildServiceProvider(validateScopes: true);
+    }
 }
 
 public sealed record EchoRequest(string Value) : IRequest<string>;
@@ -184,6 +231,53 @@ public sealed class SecondOrderedBehavior : IRequestBehavior<OrderedRequest, Uni
         var result = await next();
         request.Trace.Add("second-after");
         return result;
+    }
+}
+
+public sealed record PreparedPipelineRequest(List<int> BehaviorInstances) : IRequest<string>;
+
+public sealed class PreparedPipelineRequestHandler : IRequestHandler<PreparedPipelineRequest, string>
+{
+    public Task<string> HandleAsync(PreparedPipelineRequest request)
+    {
+        return Task.FromResult("handled");
+    }
+}
+
+public sealed class PreparedPipelineBehavior(PreparedPipelineProbe probe)
+    : IRequestBehavior<PreparedPipelineRequest, string>
+{
+    private readonly int _instanceId = probe.RecordInstanceCreated();
+
+    public int Order => probe.RecordOrderRead();
+
+    public Task<string> HandleAsync(
+        PreparedPipelineRequest request,
+        RequestHandlerDelegate<string> next)
+    {
+        request.BehaviorInstances.Add(_instanceId);
+        return next();
+    }
+}
+
+public sealed class PreparedPipelineProbe
+{
+    private int _createdCount;
+    private int _orderReadCount;
+
+    public int CreatedCount => _createdCount;
+
+    public int OrderReadCount => _orderReadCount;
+
+    public int RecordInstanceCreated()
+    {
+        return Interlocked.Increment(ref _createdCount);
+    }
+
+    public int RecordOrderRead()
+    {
+        Interlocked.Increment(ref _orderReadCount);
+        return 0;
     }
 }
 

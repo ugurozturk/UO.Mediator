@@ -7,7 +7,7 @@ namespace UO.Mediator.Dispatching;
 /// <summary>
 /// Built-in behaviour that logs request name and duration. Logs as warning when the configured slow threshold is exceeded.
 /// </summary>
-public class RequestLoggingBehavior<TRequest, TResponse>(
+public partial class RequestLoggingBehavior<TRequest, TResponse>(
     ILogger<RequestLoggingBehavior<TRequest, TResponse>> logger,
     IOptions<RequestDispatcherOptions> options) : IRequestBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
@@ -24,30 +24,45 @@ public class RequestLoggingBehavior<TRequest, TResponse>(
         RequestHandlerDelegate<TResponse> next)
     {
         var requestName = typeof(TRequest).Name;
-        var stopwatch = Stopwatch.StartNew();
+        var startTimestamp = Stopwatch.GetTimestamp();
 
-        _logger.LogDebug("Dispatching request {RequestName}", requestName);
+        LogDispatching(_logger, requestName);
         try
         {
             return await next();
         }
         finally
         {
-            stopwatch.Stop();
-            if (stopwatch.Elapsed >= _options.SlowRequestThreshold)
+            var elapsed = Stopwatch.GetElapsedTime(startTimestamp);
+            if (elapsed >= _options.SlowRequestThreshold)
             {
-                _logger.LogWarning(
-                    "Slow request {RequestName} completed in {ElapsedMilliseconds} ms",
-                    requestName,
-                    stopwatch.Elapsed.TotalMilliseconds);
+                LogSlowRequestCompleted(_logger, requestName, elapsed.TotalMilliseconds);
             }
             else
             {
-                _logger.LogDebug(
-                    "Request {RequestName} completed in {ElapsedMilliseconds} ms",
-                    requestName,
-                    stopwatch.Elapsed.TotalMilliseconds);
+                LogRequestCompleted(_logger, requestName, elapsed.TotalMilliseconds);
             }
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Dispatching request {RequestName}")]
+    private static partial void LogDispatching(ILogger logger, string requestName);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Request {RequestName} completed in {ElapsedMilliseconds} ms")]
+    private static partial void LogRequestCompleted(
+        ILogger logger,
+        string requestName,
+        double elapsedMilliseconds);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Slow request {RequestName} completed in {ElapsedMilliseconds} ms")]
+    private static partial void LogSlowRequestCompleted(
+        ILogger logger,
+        string requestName,
+        double elapsedMilliseconds);
 }

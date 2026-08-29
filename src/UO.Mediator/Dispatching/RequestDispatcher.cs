@@ -5,12 +5,14 @@ namespace UO.Mediator.Dispatching;
 
 /// <summary>
 /// Default implementation of <see cref="IRequestDispatcher"/>.
-/// Caches closed-generic executors per (request, response) pair and builds the behaviour chain once.
+/// Caches closed-generic executors globally and prepared behaviour pipelines per service provider.
 /// </summary>
 public class RequestDispatcher(IServiceProvider serviceProvider) : IRequestDispatcher
 {
     private static readonly ConcurrentDictionary<(Type Request, Type Response), IRequestExecutor> Executors = new();
     private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly RequestPipelineCache _pipelineCache =
+        serviceProvider.GetService<RequestPipelineCache>() ?? new RequestPipelineCache();
 
     /// <inheritdoc />
     public Task DispatchAsync(IRequest request)
@@ -21,7 +23,10 @@ public class RequestDispatcher(IServiceProvider serviceProvider) : IRequestDispa
             (requestType, typeof(void)),
             static key => CreateNoResponseExecutor(key.Request));
 
-        return ((INoResponseRequestExecutor)executor).ExecuteAsync(request, _serviceProvider);
+        return ((INoResponseRequestExecutor)executor).ExecuteAsync(
+            request,
+            _serviceProvider,
+            _pipelineCache);
     }
 
     /// <inheritdoc />
@@ -38,7 +43,10 @@ public class RequestDispatcher(IServiceProvider serviceProvider) : IRequestDispa
             (requestType, typeof(TResponse)),
             static key => CreateExecutor(key.Request, key.Response));
 
-        return ((IRequestExecutor<TResponse>)executor).ExecuteAsync(request, _serviceProvider);
+        return ((IRequestExecutor<TResponse>)executor).ExecuteAsync(
+            request,
+            _serviceProvider,
+            _pipelineCache);
     }
 
     private static IRequestExecutor CreateExecutor(Type requestType, Type responseType)
@@ -61,14 +69,16 @@ public class RequestDispatcher(IServiceProvider serviceProvider) : IRequestDispa
     {
         Task<TResponse> ExecuteAsync(
             IRequest<TResponse> request,
-            IServiceProvider serviceProvider);
+            IServiceProvider serviceProvider,
+            RequestPipelineCache pipelineCache);
     }
 
     private interface INoResponseRequestExecutor : IRequestExecutor
     {
         Task ExecuteAsync(
             IRequest request,
-            IServiceProvider serviceProvider);
+            IServiceProvider serviceProvider,
+            RequestPipelineCache pipelineCache);
     }
 
     private sealed class NoResponseRequestExecutor<TRequest> : INoResponseRequestExecutor
@@ -76,29 +86,14 @@ public class RequestDispatcher(IServiceProvider serviceProvider) : IRequestDispa
     {
         public async Task ExecuteAsync(
             IRequest request,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            RequestPipelineCache pipelineCache)
         {
             var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest>>();
-            var behaviors = serviceProvider
-                .GetServices<IRequestBehavior<TRequest, Unit>>()
-                .OrderBy(x => x.Order)
-                .ThenBy(x => x.GetType().FullName, StringComparer.Ordinal)
-                .ToArray();
+            var behaviors = ResolveBehaviors<IRequestBehavior<TRequest, Unit>>(serviceProvider);
+            var pipeline = pipelineCache.GetOrAddNoResponse<TRequest>(behaviors);
 
-            RequestHandlerDelegate<Unit> next = async () =>
-            {
-                await handler.HandleAsync((TRequest)request);
-                return Unit.Value;
-            };
-
-            for (var index = behaviors.Length - 1; index >= 0; index--)
-            {
-                var behavior = behaviors[index];
-                var capturedNext = next;
-                next = () => behavior.HandleAsync((TRequest)request, capturedNext);
-            }
-
-            await next();
+            await pipeline.ExecuteAsync((TRequest)request, handler, behaviors);
         }
     }
 
@@ -107,25 +102,20 @@ public class RequestDispatcher(IServiceProvider serviceProvider) : IRequestDispa
     {
         public Task<TResponse> ExecuteAsync(
             IRequest<TResponse> request,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            RequestPipelineCache pipelineCache)
         {
             var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
-            var behaviors = serviceProvider
-                .GetServices<IRequestBehavior<TRequest, TResponse>>()
-                .OrderBy(x => x.Order)
-                .ThenBy(x => x.GetType().FullName, StringComparer.Ordinal)
-                .ToArray();
+            var behaviors = ResolveBehaviors<IRequestBehavior<TRequest, TResponse>>(serviceProvider);
+            var pipeline = pipelineCache.GetOrAdd<TRequest, TResponse>(behaviors);
 
-            RequestHandlerDelegate<TResponse> next = () => handler.HandleAsync((TRequest)request);
-
-            for (var index = behaviors.Length - 1; index >= 0; index--)
-            {
-                var behavior = behaviors[index];
-                var capturedNext = next;
-                next = () => behavior.HandleAsync((TRequest)request, capturedNext);
-            }
-
-            return next();
+            return pipeline.ExecuteAsync((TRequest)request, handler, behaviors);
         }
+    }
+
+    private static IReadOnlyList<TBehavior> ResolveBehaviors<TBehavior>(IServiceProvider serviceProvider)
+    {
+        var behaviors = serviceProvider.GetServices<TBehavior>();
+        return behaviors as IReadOnlyList<TBehavior> ?? behaviors.ToArray();
     }
 }

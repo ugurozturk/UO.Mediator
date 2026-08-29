@@ -27,6 +27,7 @@ public static class UOMediatorServiceCollectionExtensions
 
         services.TryAddTransient<IRequestDispatcher, RequestDispatcher>();
         services.TryAddTransient<RequestGraphValidator>();
+        services.TryAddSingleton<RequestPipelineCache>();
         services.TryAddEnumerable(ServiceDescriptor.Transient(
             typeof(IRequestBehavior<,>),
             typeof(RequestLoggingBehavior<,>)));
