@@ -105,7 +105,7 @@ controller relies on the API host's global or fallback authorization policy.
 Routes are absolute and static. Route parameters such as `{id}` are not
 supported in the first version.
 
-## Host naming options
+## Host generator options
 
 The default convention root is `/api/app`. The API host can also add a
 compile-time prefix and suffix to every generated controller:
@@ -115,10 +115,14 @@ compile-time prefix and suffix to every generated controller:
   <UOMediatorApiRootPath>/api/catalog</UOMediatorApiRootPath>
   <UOMediatorControllerPrefix>App</UOMediatorControllerPrefix>
   <UOMediatorControllerSuffix>Service</UOMediatorControllerSuffix>
+  <UOMediatorControllerBase>MyApi.Infrastructure.CustomControllerBase</UOMediatorControllerBase>
 </PropertyGroup>
 ```
 
 With `ControllerName = "Book"`, these settings generate the stable class name
 `AppBookServiceController`. Routes are unaffected by the controller class
-prefix and suffix. Changing these properties requires recompilation because
-controller types are generated at compile time.
+prefix and suffix. `UOMediatorControllerBase` defaults to
+`Microsoft.AspNetCore.Mvc.ControllerBase`; a configured type must be available
+to the API host compilation and inherit from `ControllerBase`. Changing these
+properties requires recompilation because controller types are generated at
+compile time.

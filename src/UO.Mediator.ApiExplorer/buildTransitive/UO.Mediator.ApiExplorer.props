@@ -3,11 +3,13 @@
     <UOMediatorApiRootPath Condition="'$(UOMediatorApiRootPath)' == ''">/api/app</UOMediatorApiRootPath>
     <UOMediatorControllerPrefix Condition="'$(UOMediatorControllerPrefix)' == ''"></UOMediatorControllerPrefix>
     <UOMediatorControllerSuffix Condition="'$(UOMediatorControllerSuffix)' == ''"></UOMediatorControllerSuffix>
+    <UOMediatorControllerBase Condition="'$(UOMediatorControllerBase)' == ''">Microsoft.AspNetCore.Mvc.ControllerBase</UOMediatorControllerBase>
   </PropertyGroup>
 
   <ItemGroup>
     <CompilerVisibleProperty Include="UOMediatorApiRootPath" />
     <CompilerVisibleProperty Include="UOMediatorControllerPrefix" />
     <CompilerVisibleProperty Include="UOMediatorControllerSuffix" />
+    <CompilerVisibleProperty Include="UOMediatorControllerBase" />
   </ItemGroup>
 </Project>

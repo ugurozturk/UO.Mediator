@@ -21,6 +21,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         "UO.Mediator.Dispatching.IRequestDispatcher";
     private const string ControllerBaseMetadataName =
         "Microsoft.AspNetCore.Mvc.ControllerBase";
+    private const string DefaultControllerBase = ControllerBaseMetadataName;
     private const string DefaultRootPath = "/api/app";
     private const string RootPathBuildProperty =
         "build_property.UOMediatorApiRootPath";
@@ -28,6 +29,8 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         "build_property.UOMediatorControllerPrefix";
     private const string ControllerSuffixBuildProperty =
         "build_property.UOMediatorControllerSuffix";
+    private const string ControllerBaseBuildProperty =
+        "build_property.UOMediatorControllerBase";
 
     private static readonly SymbolDisplayFormat FullyQualifiedTypeFormat =
         SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
@@ -107,7 +110,11 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
                     GetGlobalOption(
                         options,
                         ControllerSuffixBuildProperty,
-                        string.Empty));
+                        string.Empty),
+                    GetGlobalOption(
+                        options,
+                        ControllerBaseBuildProperty,
+                        DefaultControllerBase));
             });
 
         context.RegisterSourceOutput(
@@ -143,6 +150,63 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             !TryRequireType(context, dispatcherType, DispatcherMetadataName) |
             !TryRequireType(context, controllerBaseType, ControllerBaseMetadataName))
         {
+            return;
+        }
+
+        var configuredControllerBaseOption = options.ControllerBase.Length == 0
+            ? DefaultControllerBase
+            : options.ControllerBase;
+        var configuredControllerBaseName = configuredControllerBaseOption.Trim();
+        if (configuredControllerBaseName.Length == 0)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                InvalidController,
+                Location.None,
+                "<API host>",
+                "UOMediatorControllerBase cannot be empty"));
+            return;
+        }
+
+        if (configuredControllerBaseName.StartsWith(
+                "global::",
+                StringComparison.Ordinal))
+        {
+            configuredControllerBaseName = configuredControllerBaseName.Substring(
+                "global::".Length);
+        }
+
+        var configuredControllerBaseType =
+            compilation.GetTypeByMetadataName(configuredControllerBaseName);
+        if (configuredControllerBaseType is null)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                InvalidController,
+                Location.None,
+                "<API host>",
+                $"UOMediatorControllerBase type '{configuredControllerBaseOption}' " +
+                "could not be found"));
+            return;
+        }
+
+        if (configuredControllerBaseType.IsSealed)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                InvalidController,
+                Location.None,
+                "<API host>",
+                $"UOMediatorControllerBase type '{configuredControllerBaseOption}' " +
+                "cannot be sealed"));
+            return;
+        }
+
+        if (!InheritsFromOrEquals(configuredControllerBaseType, controllerBaseType!))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                InvalidController,
+                Location.None,
+                "<API host>",
+                $"UOMediatorControllerBase type '{configuredControllerBaseOption}' " +
+                $"must inherit from '{ControllerBaseMetadataName}'"));
             return;
         }
 
@@ -228,6 +292,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
                 controllerGroup.Key + ".g.cs",
                 RenderController(
                     controllerGroup.Key,
+                    configuredControllerBaseType.ToDisplayString(FullyQualifiedTypeFormat),
                     controllerGroup
                         .OrderBy(
                             static endpoint => endpoint.ActionName,
@@ -237,6 +302,23 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
                             StringComparer.Ordinal)
                         .ToArray()));
         }
+    }
+
+    private static bool InheritsFromOrEquals(
+        INamedTypeSymbol type,
+        INamedTypeSymbol expectedBaseType)
+    {
+        for (INamedTypeSymbol? current = type;
+             current is not null;
+             current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, expectedBaseType))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryRequireType(
@@ -869,6 +951,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
 
     private static string RenderController(
         string controllerName,
+        string controllerBaseTypeName,
         IReadOnlyList<EndpointModel> endpoints)
     {
         var builder = new StringBuilder();
@@ -883,7 +966,8 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
             .AppendLine("\")]");
         builder.Append("    public partial class ")
             .Append(controllerName)
-            .AppendLine(" : global::Microsoft.AspNetCore.Mvc.ControllerBase");
+            .Append(" : ")
+            .AppendLine(controllerBaseTypeName);
         builder.AppendLine("    {");
         builder.AppendLine(
             "        private readonly global::UO.Mediator.Dispatching.IRequestDispatcher _dispatcher;");
@@ -1143,11 +1227,13 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         public GeneratorOptions(
             string rootPath,
             string controllerPrefix,
-            string controllerSuffix)
+            string controllerSuffix,
+            string controllerBase)
         {
             RootPath = rootPath;
             ControllerPrefix = controllerPrefix;
             ControllerSuffix = controllerSuffix;
+            ControllerBase = controllerBase;
         }
 
         public string RootPath { get; }
@@ -1155,6 +1241,8 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
         public string ControllerPrefix { get; }
 
         public string ControllerSuffix { get; }
+
+        public string ControllerBase { get; }
 
         public bool Equals(GeneratorOptions other)
         {
@@ -1166,6 +1254,10 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
                    string.Equals(
                        ControllerSuffix,
                        other.ControllerSuffix,
+                       StringComparison.Ordinal) &&
+                   string.Equals(
+                       ControllerBase,
+                       other.ControllerBase,
                        StringComparison.Ordinal);
         }
 
@@ -1181,6 +1273,7 @@ public sealed class MediatorApiExplorerGenerator : IIncrementalGenerator
                 var hashCode = RootPath.GetHashCode();
                 hashCode = (hashCode * 397) ^ ControllerPrefix.GetHashCode();
                 hashCode = (hashCode * 397) ^ ControllerSuffix.GetHashCode();
+                hashCode = (hashCode * 397) ^ ControllerBase.GetHashCode();
                 return hashCode;
             }
         }

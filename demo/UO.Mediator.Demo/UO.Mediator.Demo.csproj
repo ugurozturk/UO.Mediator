@@ -11,6 +11,7 @@
     <UOMediatorControllerSuffix>Service</UOMediatorControllerSuffix>
     <!-- Persist source-generator output under obj/ for inspection -->
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <UOMediatorControllerBase>UO.Mediator.Demo.Demo2ControllerBase</UOMediatorControllerBase>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,6 +25,7 @@
     <CompilerVisibleProperty Include="UOMediatorApiRootPath" />
     <CompilerVisibleProperty Include="UOMediatorControllerPrefix" />
     <CompilerVisibleProperty Include="UOMediatorControllerSuffix" />
+    <CompilerVisibleProperty Include="UOMediatorControllerBase" />
   </ItemGroup>
 
   <ItemGroup>

@@ -63,6 +63,10 @@ public class MediatorApiExplorerGeneratorTests
         Assert.Contains("FromQueryAttribute", generated, StringComparison.Ordinal);
         Assert.Contains("FromBodyAttribute", generated, StringComparison.Ordinal);
         Assert.Contains("public partial class BookController", generated, StringComparison.Ordinal);
+        Assert.Contains(
+            "BookController : global::Microsoft.AspNetCore.Mvc.ControllerBase",
+            generated,
+            StringComparison.Ordinal);
         Assert.Contains("TagsAttribute(\"Book\")", generated, StringComparison.Ordinal);
         Assert.Contains("CreateBookAsync(", generated, StringComparison.Ordinal);
         Assert.Contains("GetListBooksAsync(", generated, StringComparison.Ordinal);
@@ -73,6 +77,87 @@ public class MediatorApiExplorerGeneratorTests
             2,
             execution.RunResult.Results.SelectMany(result => result.GeneratedSources).Count());
         GeneratorTestHarness.AssertNoCompilationErrors(execution);
+    }
+
+    [Fact]
+    public void Should_Inherit_From_Configured_Controller_Base()
+    {
+        const string source = """
+            using Microsoft.AspNetCore.Mvc;
+            using UO.Mediator.ApiExplorer;
+            using UO.Mediator.Dispatching;
+
+            namespace CustomApi;
+
+            public abstract class CustomControllerBase : ControllerBase
+            {
+                public string Source => "Custom";
+            }
+
+            [MediatorApiExplorer(ControllerName = "Book")]
+            public sealed record GetBookRequest : IRequest<string>;
+            """;
+
+        var execution = GeneratorTestHarness.Run(
+            source,
+            controllerBase: "global::CustomApi.CustomControllerBase");
+        var generated = GeneratorTestHarness.GetGeneratedSource(execution);
+
+        Assert.Contains(
+            "BookController : global::CustomApi.CustomControllerBase",
+            generated,
+            StringComparison.Ordinal);
+        GeneratorTestHarness.AssertNoCompilationErrors(execution);
+    }
+
+    [Fact]
+    public void Should_Use_Default_Controller_Base_When_Build_Property_Is_Empty()
+    {
+        const string source = """
+            using UO.Mediator.ApiExplorer;
+            using UO.Mediator.Dispatching;
+
+            [MediatorApiExplorer]
+            public sealed record GetBookRequest : IRequest<string>;
+            """;
+
+        var execution = GeneratorTestHarness.Run(source, controllerBase: "");
+        var generated = GeneratorTestHarness.GetGeneratedSource(execution);
+
+        Assert.Contains(
+            "BookController : global::Microsoft.AspNetCore.Mvc.ControllerBase",
+            generated,
+            StringComparison.Ordinal);
+        GeneratorTestHarness.AssertNoCompilationErrors(execution);
+    }
+
+    [Theory]
+    [InlineData("Missing.CustomControllerBase", "could not be found")]
+    [InlineData("System.Object", "must inherit")]
+    [InlineData("System.String", "cannot be sealed")]
+    [InlineData(" ", "cannot be empty")]
+    public void Should_Report_Invalid_Configured_Controller_Base(
+        string controllerBase,
+        string expectedMessage)
+    {
+        const string source = """
+            using UO.Mediator.ApiExplorer;
+            using UO.Mediator.Dispatching;
+
+            [MediatorApiExplorer]
+            public sealed record GetBookRequest : IRequest<string>;
+            """;
+
+        var execution = GeneratorTestHarness.Run(
+            source,
+            controllerBase: controllerBase);
+        var diagnostic = Assert.Single(
+            execution.RunResult.Diagnostics.Where(candidate =>
+                candidate.Id == "UOMA007"));
+
+        Assert.Contains(expectedMessage, diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Empty(
+            execution.RunResult.Results.SelectMany(result => result.GeneratedSources));
     }
 
     [Fact]

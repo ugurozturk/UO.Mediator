@@ -16,6 +16,7 @@ internal static class GeneratorTestHarness
         string rootPath = "/api/app",
         string controllerPrefix = "",
         string controllerSuffix = "",
+        string controllerBase = "Microsoft.AspNetCore.Mvc.ControllerBase",
         params MetadataReference[] additionalReferences)
     {
         var compilation = CreateCompilation(
@@ -28,7 +29,8 @@ internal static class GeneratorTestHarness
             {
                 ["build_property.UOMediatorApiRootPath"] = rootPath,
                 ["build_property.UOMediatorControllerPrefix"] = controllerPrefix,
-                ["build_property.UOMediatorControllerSuffix"] = controllerSuffix
+                ["build_property.UOMediatorControllerSuffix"] = controllerSuffix,
+                ["build_property.UOMediatorControllerBase"] = controllerBase
             });
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
