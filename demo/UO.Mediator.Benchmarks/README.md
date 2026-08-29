@@ -57,6 +57,14 @@ changing the production dispatcher or pipeline implementation:
   `Task` handler directly with a warmed zero-behavior UO.Mediator dispatch using that
   same handler instance. The difference estimates base dispatcher and DI lookup
   overhead.
+- `UOCachedPipelineGraphPrototypeBenchmarks` compares the current captured closure,
+  readonly struct continuation, and a benchmark-only cached graph whose immutable
+  steps retain only behavior positions and downstream delegates. Handler and
+  behavior instances live in a new execution context for each dispatch.
+- `UOCachedPipelineGraphPrototypeBenchmarksDi` measures those same continuation
+  shapes after resolving a transient handler and `1`, `3`, or `5` singleton or
+  transient behaviors from Microsoft DI on every invocation. Its setup also checks
+  concurrent execution with distinct instances and reuse across scoped providers.
 
 Transient and singleton behavior results measure different Microsoft DI lifetime
 costs and should not be treated as interchangeable pipeline results. Raw DI
@@ -83,6 +91,21 @@ dotnet run -c Release --project demo/UO.Mediator.Benchmarks -- --job dry --inPro
 
 The in-process dry job is only a smoke test. Use the default isolated toolchain
 for performance comparisons.
+
+Run only the cached-graph experiment with a short development job:
+
+```bash
+dotnet run -c Release --project demo/UO.Mediator.Benchmarks -- \
+  --filter '*UOCachedPipelineGraphPrototypeBenchmarks*' \
+  -j short
+```
+
+Run the same experiment with BenchmarkDotNet's default job:
+
+```bash
+dotnet run -c Release --project demo/UO.Mediator.Benchmarks -- \
+  --filter '*UOCachedPipelineGraphPrototypeBenchmarks*'
+```
 
 BenchmarkDotNet writes detailed Markdown, CSV, and HTML reports under
 `BenchmarkDotNet.Artifacts/`. Run benchmarks on an idle machine in Release mode;
