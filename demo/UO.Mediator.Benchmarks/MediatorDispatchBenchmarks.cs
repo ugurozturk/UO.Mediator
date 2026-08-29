@@ -84,17 +84,9 @@ public class MediatorDispatchBenchmarks
 
     private static ServiceProvider CreateUOProvider(bool includeDefaultLogging)
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddUOMediator(typeof(UOPingRequest).Assembly);
-
-        if (!includeDefaultLogging)
-        {
-            var loggingBehavior = services.Single(descriptor =>
-                descriptor.ServiceType == typeof(IRequestBehavior<,>) &&
-                descriptor.ImplementationType == typeof(RequestLoggingBehavior<,>));
-            services.Remove(loggingBehavior);
-        }
+        var services = UOBenchmarkServiceCollection.Create(
+            includeDefaultLogging,
+            typeof(UOPingRequest).Assembly);
 
         return services.BuildServiceProvider(validateScopes: true);
     }

@@ -16,6 +16,18 @@ always includes `RequestLoggingBehavior`. `core dispatch` removes that descripto
 inside the benchmark setup to isolate dispatcher overhead; this is not currently
 a supported UO.Mediator configuration API.
 
+Additional UO.Mediator benchmark groups isolate specific dispatcher costs:
+
+- `UOBehaviorPipelineBenchmarks` measures `0`, `1`, `3`, and `5` empty behaviours.
+- `UODispatchShapeBenchmarks` compares response and no-response requests with both
+  synchronously completed tasks and handlers that call `Task.Yield()`.
+- `UOHandlerLookupBenchmarks` measures a warmed dispatch after preparing `10`, `100`,
+  or `1000` distinct closed request/handler pipelines.
+
+All UO.Mediator benchmarks warm the executor and pipeline caches during global setup.
+Each behavior and handler count is a separate benchmark method so BenchmarkDotNet
+reports ratios against the `0 behaviors` and `10 handlers` baselines.
+
 Run the full benchmark from the repository root:
 
 ```bash
