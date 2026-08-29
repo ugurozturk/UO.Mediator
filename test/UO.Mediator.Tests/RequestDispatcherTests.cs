@@ -23,9 +23,33 @@ public class RequestDispatcherTests
     }
 
     [Fact]
+    public async Task Should_Execute_No_Response_Handler_Exactly_Once_Without_Behaviors()
+    {
+        using var provider = BuildProviderWithoutLoggingBehavior();
+        var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
+        var command = new CountedCommand();
+
+        await dispatcher.DispatchAsync(command);
+
+        Assert.Equal(1, command.HandleCount);
+    }
+
+    [Fact]
+    public async Task Should_Run_No_Response_Behavior_When_Registered()
+    {
+        using var provider = BuildProviderWithoutLoggingBehavior();
+        var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
+        var trace = new List<string>();
+
+        await dispatcher.DispatchAsync(new SingleBehaviorCommand(trace));
+
+        Assert.Equal(["behavior", "handler"], trace);
+    }
+
+    [Fact]
     public async Task Should_Run_Behaviors_In_Order()
     {
-        using var provider = BuildProvider();
+        using var provider = BuildProviderWithoutLoggingBehavior();
         var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
         var trace = new List<string>();
 
@@ -81,6 +105,61 @@ public class RequestDispatcherTests
             () => dispatcher.DispatchAsync(new FailingRequest()));
 
         Assert.Equal("Expected test failure.", exception.Message);
+    }
+
+    [Fact]
+    public async Task Should_Propagate_The_Same_Handler_Exception_Without_Behaviors()
+    {
+        using var provider = BuildProviderWithoutLoggingBehavior();
+        var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
+        var expected = new InvalidOperationException("Expected fast-path failure.");
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => dispatcher.DispatchAsync(new AsyncFailingCommand(expected)));
+
+        Assert.Same(expected, actual);
+    }
+
+    [Fact]
+    public async Task Should_Respect_No_Response_Handler_Lifetimes_Without_Behaviors()
+    {
+        var transientProbe = new TransientHandlerProbe();
+        var scopedProbe = new ScopedHandlerProbe();
+        using var provider = BuildProviderWithoutLoggingBehavior(services =>
+        {
+            services.AddSingleton(transientProbe);
+            services.AddSingleton(scopedProbe);
+            services.AddScoped<
+                IRequestHandler<ScopedLifetimeCommand>,
+                ScopedLifetimeCommandHandler>();
+        });
+
+        var firstTransient = new TransientLifetimeCommand();
+        var secondTransient = new TransientLifetimeCommand();
+        var firstScoped = new ScopedLifetimeCommand();
+        var secondScoped = new ScopedLifetimeCommand();
+        var thirdScoped = new ScopedLifetimeCommand();
+
+        using (var scope = provider.CreateScope())
+        {
+            var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
+            await dispatcher.DispatchAsync(firstTransient);
+            await dispatcher.DispatchAsync(secondTransient);
+            await dispatcher.DispatchAsync(firstScoped);
+            await dispatcher.DispatchAsync(secondScoped);
+        }
+
+        using (var scope = provider.CreateScope())
+        {
+            var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
+            await dispatcher.DispatchAsync(thirdScoped);
+        }
+
+        Assert.Equal(2, transientProbe.CreatedCount);
+        Assert.NotEqual(firstTransient.HandlerInstance, secondTransient.HandlerInstance);
+        Assert.Equal(2, scopedProbe.CreatedCount);
+        Assert.Equal(firstScoped.HandlerInstance, secondScoped.HandlerInstance);
+        Assert.NotEqual(firstScoped.HandlerInstance, thirdScoped.HandlerInstance);
     }
 
     [Fact]
@@ -152,7 +231,25 @@ public class RequestDispatcherTests
         services.AddLogging();
         services.AddSingleton<ITestCancellationTokenProvider>(
             new TestCancellationTokenProvider(cancellationToken));
+        services.AddSingleton<TransientHandlerProbe>();
+        services.AddSingleton<ScopedHandlerProbe>();
         services.AddUOMediator(typeof(RequestDispatcherTests).Assembly);
+        return services.BuildServiceProvider(validateScopes: true);
+    }
+
+    private static ServiceProvider BuildProviderWithoutLoggingBehavior(
+        Action<IServiceCollection>? configure = null)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        configure?.Invoke(services);
+        services.AddUOMediator(typeof(RequestDispatcherTests).Assembly);
+
+        var loggingBehavior = services.Single(descriptor =>
+            descriptor.ServiceType == typeof(IRequestBehavior<,>) &&
+            descriptor.ImplementationType == typeof(RequestLoggingBehavior<,>));
+        services.Remove(loggingBehavior);
+
         return services.BuildServiceProvider(validateScopes: true);
     }
 
@@ -190,6 +287,42 @@ public sealed class RecordCommandHandler : IRequestHandler<RecordCommand>
     {
         request.WasHandled = true;
         return Task.CompletedTask;
+    }
+}
+
+public sealed class CountedCommand : IRequest
+{
+    public int HandleCount { get; set; }
+}
+
+public sealed class CountedCommandHandler : IRequestHandler<CountedCommand>
+{
+    public Task HandleAsync(CountedCommand request)
+    {
+        request.HandleCount++;
+        return Task.CompletedTask;
+    }
+}
+
+public sealed record SingleBehaviorCommand(List<string> Trace) : IRequest;
+
+public sealed class SingleBehaviorCommandHandler : IRequestHandler<SingleBehaviorCommand>
+{
+    public Task HandleAsync(SingleBehaviorCommand request)
+    {
+        request.Trace.Add("handler");
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class SingleBehaviorCommandBehavior : IRequestBehavior<SingleBehaviorCommand, Unit>
+{
+    public Task<Unit> HandleAsync(
+        SingleBehaviorCommand request,
+        RequestHandlerDelegate<Unit> next)
+    {
+        request.Trace.Add("behavior");
+        return next();
     }
 }
 
@@ -316,6 +449,70 @@ public sealed class FailingRequestHandler : IRequestHandler<FailingRequest>
     {
         throw new InvalidOperationException("Expected test failure.");
     }
+}
+
+public sealed record AsyncFailingCommand(Exception Exception) : IRequest;
+
+public sealed class AsyncFailingCommandHandler : IRequestHandler<AsyncFailingCommand>
+{
+    public Task HandleAsync(AsyncFailingCommand request)
+    {
+        return Task.FromException(request.Exception);
+    }
+}
+
+public sealed class TransientLifetimeCommand : IRequest
+{
+    public int HandlerInstance { get; set; }
+}
+
+public sealed class TransientLifetimeCommandHandler(TransientHandlerProbe probe)
+    : IRequestHandler<TransientLifetimeCommand>
+{
+    private readonly int _instanceId = probe.RecordInstanceCreated();
+
+    public Task HandleAsync(TransientLifetimeCommand request)
+    {
+        request.HandlerInstance = _instanceId;
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class ScopedLifetimeCommand : IRequest
+{
+    public int HandlerInstance { get; set; }
+}
+
+public sealed class ScopedLifetimeCommandHandler(ScopedHandlerProbe probe)
+    : IRequestHandler<ScopedLifetimeCommand>
+{
+    private readonly int _instanceId = probe.RecordInstanceCreated();
+
+    public Task HandleAsync(ScopedLifetimeCommand request)
+    {
+        request.HandlerInstance = _instanceId;
+        return Task.CompletedTask;
+    }
+}
+
+public abstract class HandlerLifetimeProbe
+{
+    private int _createdCount;
+
+    public int CreatedCount => _createdCount;
+
+    public int RecordInstanceCreated()
+    {
+        return Interlocked.Increment(ref _createdCount);
+    }
+}
+
+public sealed class TransientHandlerProbe : HandlerLifetimeProbe
+{
+}
+
+public sealed class ScopedHandlerProbe : HandlerLifetimeProbe
+{
 }
 
 public abstract record MissingRequest : IRequest;

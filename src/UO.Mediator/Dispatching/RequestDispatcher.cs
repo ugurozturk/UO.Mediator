@@ -84,16 +84,21 @@ public class RequestDispatcher(IServiceProvider serviceProvider) : IRequestDispa
     private sealed class NoResponseRequestExecutor<TRequest> : INoResponseRequestExecutor
         where TRequest : IRequest
     {
-        public async Task ExecuteAsync(
+        public Task ExecuteAsync(
             IRequest request,
             IServiceProvider serviceProvider,
             RequestPipelineCache pipelineCache)
         {
             var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest>>();
             var behaviors = ResolveBehaviors<IRequestBehavior<TRequest, Unit>>(serviceProvider);
-            var pipeline = pipelineCache.GetOrAddNoResponse<TRequest>(behaviors);
 
-            await pipeline.ExecuteAsync((TRequest)request, handler, behaviors);
+            if (behaviors.Count == 0)
+            {
+                return handler.HandleAsync((TRequest)request);
+            }
+
+            var pipeline = pipelineCache.GetOrAddNoResponse<TRequest>(behaviors);
+            return pipeline.ExecuteAsync((TRequest)request, handler, behaviors);
         }
     }
 
