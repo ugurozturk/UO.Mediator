@@ -21,7 +21,7 @@ public class UODirectHandlerBaselineBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        var services = UOBenchmarkServiceCollection.Create(includeDefaultLogging: false);
+        var services = UOBenchmarkServiceCollection.Create(includeRequestLogging: false);
         services.AddSingleton<IRequestHandler<BehaviorPipelineRequest, int>>(_handler);
 
         _provider = services.BuildServiceProvider(validateScopes: true);

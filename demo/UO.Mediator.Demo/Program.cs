@@ -8,6 +8,7 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<BookStore>();
 builder.Services.AddUOMediator(typeof(Program).Assembly);
+builder.Services.AddUOMediatorRequestLogging();
 
 var app = builder.Build();
 

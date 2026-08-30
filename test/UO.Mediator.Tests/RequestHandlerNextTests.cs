@@ -133,7 +133,7 @@ public class RequestHandlerNextTests
                     IRequestHandler<LoggedHandlerFailureRequest, int>,
                     LoggedHandlerFailureHandler>();
             },
-            includeDefaultLogging: true);
+            includeRequestLogging: true);
         var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
 
         var actual = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -214,19 +214,16 @@ public class RequestHandlerNextTests
 
     private static ServiceProvider BuildProvider(
         Action<IServiceCollection> configure,
-        bool includeDefaultLogging = false)
+        bool includeRequestLogging = false)
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddUOMediator();
         configure(services);
 
-        if (!includeDefaultLogging)
+        if (includeRequestLogging)
         {
-            var loggingBehavior = services.Single(descriptor =>
-                descriptor.ServiceType == typeof(IRequestBehavior<,>) &&
-                descriptor.ImplementationType == typeof(RequestLoggingBehavior<,>));
-            services.Remove(loggingBehavior);
+            services.AddUOMediatorRequestLogging();
         }
 
         return services.BuildServiceProvider(validateScopes: true);

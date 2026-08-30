@@ -23,7 +23,7 @@ public class UODispatchShapeBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        var services = UOBenchmarkServiceCollection.Create(includeDefaultLogging: false);
+        var services = UOBenchmarkServiceCollection.Create(includeRequestLogging: false);
         services.AddTransient<IRequestHandler<SyncResponseRequest, int>, SyncResponseRequestHandler>();
         services.AddTransient<IRequestHandler<SyncCommand>, SyncCommandHandler>();
         services.AddTransient<IRequestHandler<YieldResponseRequest, int>, YieldResponseRequestHandler>();

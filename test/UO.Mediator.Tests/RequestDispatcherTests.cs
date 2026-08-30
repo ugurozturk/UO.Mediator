@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using UO.Mediator.Dispatching;
 using Xunit;
 
@@ -25,7 +26,7 @@ public class RequestDispatcherTests
     [Fact]
     public async Task Should_Execute_No_Response_Handler_Exactly_Once_Without_Behaviors()
     {
-        using var provider = BuildProviderWithoutLoggingBehavior();
+        using var provider = BuildProviderWithServices();
         var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
         var command = new CountedCommand();
 
@@ -37,7 +38,7 @@ public class RequestDispatcherTests
     [Fact]
     public async Task Should_Run_No_Response_Behavior_When_Registered()
     {
-        using var provider = BuildProviderWithoutLoggingBehavior();
+        using var provider = BuildProviderWithServices();
         var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
         var trace = new List<string>();
 
@@ -49,7 +50,7 @@ public class RequestDispatcherTests
     [Fact]
     public async Task Should_Run_Behaviors_In_Order()
     {
-        using var provider = BuildProviderWithoutLoggingBehavior();
+        using var provider = BuildProviderWithServices();
         var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
         var trace = new List<string>();
 
@@ -110,7 +111,7 @@ public class RequestDispatcherTests
     [Fact]
     public async Task Should_Propagate_The_Same_Handler_Exception_Without_Behaviors()
     {
-        using var provider = BuildProviderWithoutLoggingBehavior();
+        using var provider = BuildProviderWithServices();
         var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
         var expected = new InvalidOperationException("Expected fast-path failure.");
 
@@ -125,7 +126,7 @@ public class RequestDispatcherTests
     {
         var transientProbe = new TransientHandlerProbe();
         var scopedProbe = new ScopedHandlerProbe();
-        using var provider = BuildProviderWithoutLoggingBehavior(services =>
+        using var provider = BuildProviderWithServices(services =>
         {
             services.AddSingleton(transientProbe);
             services.AddSingleton(scopedProbe);
@@ -191,6 +192,44 @@ public class RequestDispatcherTests
     }
 
     [Fact]
+    public void Mediator_Registration_Should_Not_Enable_Request_Logging_By_Default()
+    {
+        var services = new ServiceCollection();
+
+        services.AddUOMediator(typeof(RequestDispatcherTests).Assembly);
+
+        Assert.DoesNotContain(
+            services,
+            descriptor =>
+                descriptor.ServiceType == typeof(IRequestBehavior<,>) &&
+                descriptor.ImplementationType == typeof(RequestLoggingBehavior<,>));
+    }
+
+    [Fact]
+    public void Request_Logging_Should_Be_Explicit_Configurable_And_Idempotent()
+    {
+        var services = new ServiceCollection();
+        var threshold = TimeSpan.FromMilliseconds(750);
+        services.AddLogging();
+        services.AddUOMediator(typeof(RequestDispatcherTests).Assembly);
+
+        services.AddUOMediatorRequestLogging(options =>
+            options.SlowRequestThreshold = threshold);
+        services.AddUOMediatorRequestLogging();
+
+        var loggingBehavior = Assert.Single(
+            services,
+            descriptor =>
+                descriptor.ServiceType == typeof(IRequestBehavior<,>) &&
+                descriptor.ImplementationType == typeof(RequestLoggingBehavior<,>));
+        Assert.Equal(ServiceLifetime.Transient, loggingBehavior.Lifetime);
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        var options = provider.GetRequiredService<IOptions<RequestLoggingOptions>>().Value;
+        Assert.Equal(threshold, options.SlowRequestThreshold);
+    }
+
+    [Fact]
     public void Public_Mediator_Contracts_Should_Not_Expose_CancellationToken()
     {
         var contracts = new[]
@@ -237,18 +276,13 @@ public class RequestDispatcherTests
         return services.BuildServiceProvider(validateScopes: true);
     }
 
-    private static ServiceProvider BuildProviderWithoutLoggingBehavior(
+    private static ServiceProvider BuildProviderWithServices(
         Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
         configure?.Invoke(services);
         services.AddUOMediator(typeof(RequestDispatcherTests).Assembly);
-
-        var loggingBehavior = services.Single(descriptor =>
-            descriptor.ServiceType == typeof(IRequestBehavior<,>) &&
-            descriptor.ImplementationType == typeof(RequestLoggingBehavior<,>));
-        services.Remove(loggingBehavior);
 
         return services.BuildServiceProvider(validateScopes: true);
     }

@@ -108,7 +108,7 @@ public class UOBehaviorLifetimeBenchmarks
         int behaviorCount,
         ServiceLifetime behaviorLifetime)
     {
-        var services = UOBenchmarkServiceCollection.Create(includeDefaultLogging: false);
+        var services = UOBenchmarkServiceCollection.Create(includeRequestLogging: false);
         services.AddSingleton<IRequestHandler<BehaviorPipelineRequest, int>>(_handler);
 
         for (var index = 0; index < behaviorCount; index++)

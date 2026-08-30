@@ -21,30 +21,30 @@ public class MediatorDispatchBenchmarks
     private readonly MartinPingRequest _martinRequest = new(42);
 
     private ServiceProvider _uoDefaultProvider = null!;
-    private ServiceProvider _uoCoreProvider = null!;
+    private ServiceProvider _uoWithLoggingProvider = null!;
     private ServiceProvider _mediatRProvider = null!;
     private ServiceProvider _martinProvider = null!;
 
     private IRequestDispatcher _uoDefault = null!;
-    private IRequestDispatcher _uoCore = null!;
+    private IRequestDispatcher _uoWithLogging = null!;
     private MediatRSenderContract _mediatR = null!;
     private MartinMediatorContract _martin = null!;
 
     [GlobalSetup]
     public void Setup()
     {
-        _uoDefaultProvider = CreateUOProvider(includeDefaultLogging: true);
-        _uoCoreProvider = CreateUOProvider(includeDefaultLogging: false);
+        _uoDefaultProvider = CreateUOProvider(includeRequestLogging: false);
+        _uoWithLoggingProvider = CreateUOProvider(includeRequestLogging: true);
         _mediatRProvider = CreateMediatRProvider();
         _martinProvider = CreateMartinProvider();
 
         _uoDefault = _uoDefaultProvider.GetRequiredService<IRequestDispatcher>();
-        _uoCore = _uoCoreProvider.GetRequiredService<IRequestDispatcher>();
+        _uoWithLogging = _uoWithLoggingProvider.GetRequiredService<IRequestDispatcher>();
         _mediatR = _mediatRProvider.GetRequiredService<MediatRSenderContract>();
         _martin = _martinProvider.GetRequiredService<MartinMediatorContract>();
 
         _uoDefault.DispatchAsync(_uoRequest).GetAwaiter().GetResult();
-        _uoCore.DispatchAsync(_uoRequest).GetAwaiter().GetResult();
+        _uoWithLogging.DispatchAsync(_uoRequest).GetAwaiter().GetResult();
         _mediatR.Send(_mediatRRequest).GetAwaiter().GetResult();
         _martin.Send(_martinRequest).GetAwaiter().GetResult();
     }
@@ -53,21 +53,21 @@ public class MediatorDispatchBenchmarks
     public void Cleanup()
     {
         _uoDefaultProvider.Dispose();
-        _uoCoreProvider.Dispose();
+        _uoWithLoggingProvider.Dispose();
         _mediatRProvider.Dispose();
         _martinProvider.Dispose();
     }
 
-    [Benchmark(Baseline = true, Description = "UO.Mediator (default logging)")]
+    [Benchmark(Baseline = true, Description = "UO.Mediator (default/core dispatch)")]
     public Task<int> UOMediatorDefault()
     {
         return _uoDefault.DispatchAsync(_uoRequest);
     }
 
-    [Benchmark(Description = "UO.Mediator (core dispatch)")]
-    public Task<int> UOMediatorCore()
+    [Benchmark(Description = "UO.Mediator (+ request logging)")]
+    public Task<int> UOMediatorWithRequestLogging()
     {
-        return _uoCore.DispatchAsync(_uoRequest);
+        return _uoWithLogging.DispatchAsync(_uoRequest);
     }
 
     [Benchmark(Description = "MediatR")]
@@ -82,10 +82,10 @@ public class MediatorDispatchBenchmarks
         return _martin.Send(_martinRequest);
     }
 
-    private static ServiceProvider CreateUOProvider(bool includeDefaultLogging)
+    private static ServiceProvider CreateUOProvider(bool includeRequestLogging)
     {
         var services = UOBenchmarkServiceCollection.Create(
-            includeDefaultLogging,
+            includeRequestLogging,
             typeof(UOPingRequest).Assembly);
 
         return services.BuildServiceProvider(validateScopes: true);

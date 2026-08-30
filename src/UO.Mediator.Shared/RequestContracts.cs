@@ -176,10 +176,4 @@ public class RequestDispatcherOptions
     /// Assemblies scanned for request handlers, behaviours and startup validation.
     /// </summary>
     public IList<Assembly> Assemblies { get; } = [];
-
-    /// <summary>
-    /// Requests that take longer than this threshold are logged as warnings.
-    /// Defaults to 1 second.
-    /// </summary>
-    public TimeSpan SlowRequestThreshold { get; set; } = TimeSpan.FromSeconds(1);
 }

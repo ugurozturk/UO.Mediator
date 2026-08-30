@@ -60,7 +60,7 @@ public class UOHandlerLookupBenchmarks
 
     private void Setup(int handlerCount)
     {
-        var services = UOBenchmarkServiceCollection.Create(includeDefaultLogging: false);
+        var services = UOBenchmarkServiceCollection.Create(includeRequestLogging: false);
         services.AddTransient(typeof(IRequestHandler<,>), typeof(LookupRequestHandler<,>));
 
         _provider = services.BuildServiceProvider(validateScopes: true);

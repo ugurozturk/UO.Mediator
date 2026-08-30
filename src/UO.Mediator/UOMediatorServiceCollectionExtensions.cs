@@ -28,9 +28,6 @@ public static class UOMediatorServiceCollectionExtensions
         services.TryAddTransient<IRequestDispatcher, RequestDispatcher>();
         services.TryAddTransient<RequestGraphValidator>();
         services.TryAddSingleton<RequestPipelineCache>();
-        services.TryAddEnumerable(ServiceDescriptor.Transient(
-            typeof(IRequestBehavior<,>),
-            typeof(RequestLoggingBehavior<,>)));
 
         services.Configure<RequestDispatcherOptions>(options =>
         {
@@ -49,6 +46,28 @@ public static class UOMediatorServiceCollectionExtensions
         {
             AddRequestServiceType(services, type);
         }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the optional request logging behavior to the mediator pipeline.
+    /// </summary>
+    public static IServiceCollection AddUOMediatorRequestLogging(
+        this IServiceCollection services,
+        Action<RequestLoggingOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddOptions<RequestLoggingOptions>();
+        if (configure is not null)
+        {
+            services.Configure(configure);
+        }
+
+        services.TryAddEnumerable(ServiceDescriptor.Transient(
+            typeof(IRequestBehavior<,>),
+            typeof(RequestLoggingBehavior<,>)));
 
         return services;
     }

@@ -9,11 +9,11 @@ namespace UO.Mediator.Dispatching;
 /// </summary>
 public partial class RequestLoggingBehavior<TRequest, TResponse>(
     ILogger<RequestLoggingBehavior<TRequest, TResponse>> logger,
-    IOptions<RequestDispatcherOptions> options) : IRequestBehavior<TRequest, TResponse>
+    IOptions<RequestLoggingOptions> options) : IRequestBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
     private readonly ILogger<RequestLoggingBehavior<TRequest, TResponse>> _logger = logger;
-    private readonly RequestDispatcherOptions _options = options.Value;
+    private readonly RequestLoggingOptions _options = options.Value;
 
     /// <inheritdoc />
     public int Order => int.MinValue;

@@ -72,7 +72,7 @@ public class UOBehaviorPipelineBenchmarks
 
     private static (ServiceProvider Provider, IRequestDispatcher Dispatcher) CreateCase(int behaviorCount)
     {
-        var services = UOBenchmarkServiceCollection.Create(includeDefaultLogging: false);
+        var services = UOBenchmarkServiceCollection.Create(includeRequestLogging: false);
         services.AddTransient<IRequestHandler<BehaviorPipelineRequest, int>, BehaviorPipelineRequestHandler>();
 
         for (var index = 0; index < behaviorCount; index++)

@@ -138,17 +138,24 @@ Task<TResponse> HandleAsync(
     RequestHandlerNext<TRequest, TResponse> next) => next.InvokeAsync();
 ```
 
-The built-in `RequestLoggingBehavior` runs at `Order = int.MinValue` and logs request
-duration. Requests slower than the configured threshold are logged as warnings.
+Request logging is optional. The built-in `RequestLoggingBehavior` runs at
+`Order = int.MinValue`, logs request duration, and writes a warning when the
+configured threshold is exceeded.
 
-## Configuration
+## Optional request logging
 
 ```csharp
-services.AddUOMediator(options =>
+services.AddUOMediator(typeof(CreateOrderHandler).Assembly);
+
+services.AddUOMediatorRequestLogging(options =>
 {
     options.SlowRequestThreshold = TimeSpan.FromMilliseconds(500);
-}, typeof(CreateOrderHandler).Assembly);
+});
 ```
+
+`AddUOMediator` does not register logging by default. Applications that use their
+own logging, tracing or OpenTelemetry behavior can omit
+`AddUOMediatorRequestLogging` entirely.
 
 ## Startup validation
 
@@ -180,6 +187,8 @@ contracts.
   `AddUOMediator`.
 - Multiple behaviours for the same request/response pair are supported via
   `TryAddEnumerable`.
+- Request logging is opt-in through `AddUOMediatorRequestLogging` and uses
+  `RequestLoggingOptions`.
 - The dispatcher caches a closed-generic executor per `(request, response)` pair, so
   reflection is not used per dispatch.
 - The package does not replace unit of work, authorization or feature management boundaries.

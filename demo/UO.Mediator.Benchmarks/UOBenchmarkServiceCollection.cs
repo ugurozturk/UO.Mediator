@@ -7,19 +7,16 @@ namespace UO.Mediator.Benchmarks;
 internal static class UOBenchmarkServiceCollection
 {
     public static ServiceCollection Create(
-        bool includeDefaultLogging,
+        bool includeRequestLogging,
         params Assembly[] assemblies)
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddUOMediator(assemblies);
 
-        if (!includeDefaultLogging)
+        if (includeRequestLogging)
         {
-            var loggingBehavior = services.Single(descriptor =>
-                descriptor.ServiceType == typeof(IRequestBehavior<,>) &&
-                descriptor.ImplementationType == typeof(RequestLoggingBehavior<,>));
-            services.Remove(loggingBehavior);
+            services.AddUOMediatorRequestLogging();
         }
 
         return services;
