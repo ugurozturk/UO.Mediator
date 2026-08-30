@@ -10,7 +10,6 @@
     <!-- NuGet packaging -->
     <IsPackable>true</IsPackable>
     <PackageId>UO.Mediator</PackageId>
-    <Version>2.4.1</Version>
     <Authors>UO</Authors>
     <Company>UO</Company>
     <Description>Lightweight request dispatcher / mediator for .NET applications.</Description>
