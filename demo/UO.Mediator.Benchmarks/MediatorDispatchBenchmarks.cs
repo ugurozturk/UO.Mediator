@@ -6,6 +6,7 @@ using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using UO.Mediator.Benchmarks.Cases;
 using UO.Mediator.Dispatching;
+using UO.Mediator.Generated;
 using MediatRSenderContract = MediatR.ISender;
 using MartinMediatorContract = Mediator.IMediator;
 
@@ -22,11 +23,15 @@ public class MediatorDispatchBenchmarks
 
     private ServiceProvider _uoDefaultProvider = null!;
     private ServiceProvider _uoCoreProvider = null!;
+    private ServiceProvider _uoGeneratedRegistryProvider = null!;
+    private ServiceProvider _uoGeneratedRoutesProvider = null!;
     private ServiceProvider _mediatRProvider = null!;
     private ServiceProvider _martinProvider = null!;
 
     private IRequestDispatcher _uoDefault = null!;
     private IRequestDispatcher _uoCore = null!;
+    private IRequestDispatcher _uoGeneratedRegistry = null!;
+    private IRequestDispatcher _uoGeneratedRoutes = null!;
     private MediatRSenderContract _mediatR = null!;
     private MartinMediatorContract _martin = null!;
 
@@ -35,16 +40,22 @@ public class MediatorDispatchBenchmarks
     {
         _uoDefaultProvider = CreateUOProvider(includeDefaultLogging: true);
         _uoCoreProvider = CreateUOProvider(includeDefaultLogging: false);
+        _uoGeneratedRegistryProvider = CreateGeneratedRegistryUOProvider();
+        _uoGeneratedRoutesProvider = CreateGeneratedRoutesUOProvider();
         _mediatRProvider = CreateMediatRProvider();
         _martinProvider = CreateMartinProvider();
 
         _uoDefault = _uoDefaultProvider.GetRequiredService<IRequestDispatcher>();
         _uoCore = _uoCoreProvider.GetRequiredService<IRequestDispatcher>();
+        _uoGeneratedRegistry = _uoGeneratedRegistryProvider.GetRequiredService<IRequestDispatcher>();
+        _uoGeneratedRoutes = _uoGeneratedRoutesProvider.GetRequiredService<IRequestDispatcher>();
         _mediatR = _mediatRProvider.GetRequiredService<MediatRSenderContract>();
         _martin = _martinProvider.GetRequiredService<MartinMediatorContract>();
 
         _uoDefault.DispatchAsync(_uoRequest).GetAwaiter().GetResult();
         _uoCore.DispatchAsync(_uoRequest).GetAwaiter().GetResult();
+        _uoGeneratedRegistry.DispatchAsync(_uoRequest).GetAwaiter().GetResult();
+        _uoGeneratedRoutes.DispatchAsync(_uoRequest).GetAwaiter().GetResult();
         _mediatR.Send(_mediatRRequest).GetAwaiter().GetResult();
         _martin.Send(_martinRequest).GetAwaiter().GetResult();
     }
@@ -54,6 +65,8 @@ public class MediatorDispatchBenchmarks
     {
         _uoDefaultProvider.Dispose();
         _uoCoreProvider.Dispose();
+        _uoGeneratedRegistryProvider.Dispose();
+        _uoGeneratedRoutesProvider.Dispose();
         _mediatRProvider.Dispose();
         _martinProvider.Dispose();
     }
@@ -68,6 +81,18 @@ public class MediatorDispatchBenchmarks
     public Task<int> UOMediatorCore()
     {
         return _uoCore.DispatchAsync(_uoRequest);
+    }
+
+    [Benchmark(Description = "UO.Mediator (generated registry)")]
+    public Task<int> UOMediatorGeneratedRegistry()
+    {
+        return _uoGeneratedRegistry.DispatchAsync(_uoRequest);
+    }
+
+    [Benchmark(Description = "UO.Mediator (generated routes)")]
+    public Task<int> UOMediatorGeneratedRoutes()
+    {
+        return _uoGeneratedRoutes.DispatchAsync(_uoRequest);
     }
 
     [Benchmark(Description = "MediatR")]
@@ -98,6 +123,44 @@ public class MediatorDispatchBenchmarks
         services.AddMediatR(configuration =>
             configuration.RegisterServicesFromAssemblyContaining<MediatRPingRequest>());
         return services.BuildServiceProvider(validateScopes: true);
+    }
+
+    private static ServiceProvider CreateGeneratedRegistryUOProvider()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddUOMediatorCore();
+        services.AddGeneratedRequest<UOPingRequest, int, UOPingRequestHandler>();
+        RemoveLoggingBehavior(services);
+
+        return services.BuildServiceProvider(validateScopes: true);
+    }
+
+    private static ServiceProvider CreateGeneratedRoutesUOProvider()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddBenchmarksUOMediator();
+        RemoveLoggingBehavior(services);
+
+        return services.BuildServiceProvider(validateScopes: true);
+    }
+
+    private static void RemoveLoggingBehavior(IServiceCollection services)
+    {
+        var loggingBehaviors = services.Where(descriptor =>
+        {
+            var implementationType = descriptor.ImplementationType;
+            return implementationType == typeof(RequestLoggingBehavior<,>) ||
+                   implementationType is { IsGenericType: true } &&
+                   implementationType.GetGenericTypeDefinition() ==
+                   typeof(RequestLoggingBehavior<,>);
+        }).ToArray();
+
+        foreach (var loggingBehavior in loggingBehaviors)
+        {
+            services.Remove(loggingBehavior);
+        }
     }
 
     private static ServiceProvider CreateMartinProvider()

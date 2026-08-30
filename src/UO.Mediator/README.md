@@ -10,23 +10,30 @@ Lightweight, framework-neutral request dispatcher / mediator for .NET applicatio
 
 ```bash
 dotnet add package UO.Mediator
+dotnet add package UO.Mediator.Generators
 ```
 
 ## Quick start
 
-Register the dispatcher and explicitly list the assemblies that contain handlers and
-behaviours:
+Reference `UO.Mediator.Generators` as a private analyzer asset in each assembly that owns
+handlers. For an assembly named `My.Application`, register its generated graph with:
 
 ```csharp
-services.AddUOMediator(typeof(CreateOrderHandler).Assembly);
+using UO.Mediator.Generated;
+
+services.AddMyApplicationUOMediator();
 ```
+
+The generated method explicitly registers the assembly's handlers, closed behaviors, and
+strongly typed request routes. It does not scan the assembly or construct closed generic
+executors at runtime.
 
 Define a request and a handler:
 
 ```csharp
 using UO.Mediator.Dispatching;
 
-public sealed record CreateOrderRequest(string CustomerName) : IRequest<Guid>;
+public sealed partial record CreateOrderRequest(string CustomerName) : IRequest<Guid>;
 
 public sealed class CreateOrderHandler : IRequestHandler<CreateOrderRequest, Guid>
 {
@@ -52,7 +59,7 @@ public class OrderService(IRequestDispatcher dispatcher)
 ## Commands without a response
 
 ```csharp
-public sealed record SendNotificationRequest(string Message) : IRequest;
+public sealed partial record SendNotificationRequest(string Message) : IRequest;
 
 public sealed class SendNotificationHandler : IRequestHandler<SendNotificationRequest>
 {
@@ -144,10 +151,17 @@ duration. Requests slower than the configured threshold are logged as warnings.
 ## Configuration
 
 ```csharp
-services.AddUOMediator(options =>
+services.AddMyApplicationUOMediator(options =>
 {
     options.SlowRequestThreshold = TimeSpan.FromMilliseconds(500);
-}, typeof(CreateOrderHandler).Assembly);
+});
+```
+
+Call each generated method when the application contains handlers from multiple assemblies.
+The reflection-compatible registration API remains available for existing applications:
+
+```csharp
+services.AddUOMediator(typeof(CreateOrderHandler).Assembly);
 ```
 
 ## Startup validation
@@ -155,7 +169,8 @@ services.AddUOMediator(options =>
 Call `ValidateUOMediator()` during application initialization after the service provider
 is built. It ensures:
 
-- Every concrete request in the registered assemblies has exactly one handler.
+- Every generated request registration resolves exactly one handler. The compatibility path
+  also scans its registered assemblies for missing or duplicate handlers.
 - Every handler can be resolved from dependency injection.
 
 ```csharp
@@ -176,14 +191,28 @@ contracts.
 
 ## Design notes
 
-- Handlers are registered as transient services from the assemblies passed to
-  `AddUOMediator`.
-- Multiple behaviours for the same request/response pair are supported via
-  `TryAddEnumerable`.
-- The dispatcher caches a closed-generic executor per `(request, response)` pair, so
-  reflection is not used per dispatch.
+- Generated registration emits transient handler and closed-behavior registrations for each
+  handler assembly. Registrations supplied by the application first are preserved, including
+  scoped and singleton lifetimes.
+- A top-level, non-generic `partial` request receives an O(1) strongly typed self-route. Its
+  successful dispatch bypasses runtime request-type and executor dictionary lookup.
+- Non-partial, nested, and generic request types use the generated executor registry fallback.
+  They still avoid runtime `MakeGenericType` and `Activator.CreateInstance`.
+- `AddUOMediator(Assembly[])` remains a compatibility path that scans assemblies and creates
+  closed generic executors on first use.
+- Multiple behaviours for the same request/response pair are supported. Generated
+  registration uses a per-assembly index to preserve existing registrations without
+  quadratic duplicate checks.
+- The existing readonly-struct behavior pipeline remains runtime-managed so DI lifetimes,
+  ordering, short-circuiting, and repeated/concurrent `next` calls keep the same semantics.
+- Generated routes cache code and immutable pipeline metadata only. Handler, behavior,
+  request, scope, and service-provider instances are never cached by generated code.
 - The package does not replace unit of work, authorization or feature management boundaries.
   Keep those concerns in the consuming framework or inside handlers as appropriate.
+
+See the measured architecture, startup/dispatch benchmarks, NativeAOT proof, and adoption
+decision in
+[`docs/source-generated-dispatch-evaluation.md`](../../docs/source-generated-dispatch-evaluation.md).
 
 ## ASP.NET Core API generation
 

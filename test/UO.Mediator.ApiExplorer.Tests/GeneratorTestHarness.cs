@@ -3,8 +3,11 @@ using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using UO.Mediator;
 using UO.Mediator.ApiExplorer.Generators;
 using UO.Mediator.Dispatching;
+using UO.Mediator.Generators;
 using Xunit;
 
 namespace UO.Mediator.ApiExplorer.Tests;
@@ -17,6 +20,43 @@ internal static class GeneratorTestHarness
         string controllerPrefix = "",
         string controllerSuffix = "",
         string controllerBase = "Microsoft.AspNetCore.Mvc.ControllerBase",
+        params MetadataReference[] additionalReferences)
+    {
+        return RunCore(
+            source,
+            includeMediatorRegistration: false,
+            rootPath,
+            controllerPrefix,
+            controllerSuffix,
+            controllerBase,
+            additionalReferences);
+    }
+
+    public static GeneratorExecution RunWithMediatorRegistration(
+        string source,
+        string rootPath = "/api/app",
+        string controllerPrefix = "",
+        string controllerSuffix = "",
+        string controllerBase = "Microsoft.AspNetCore.Mvc.ControllerBase",
+        params MetadataReference[] additionalReferences)
+    {
+        return RunCore(
+            source,
+            includeMediatorRegistration: true,
+            rootPath,
+            controllerPrefix,
+            controllerSuffix,
+            controllerBase,
+            additionalReferences);
+    }
+
+    private static GeneratorExecution RunCore(
+        string source,
+        bool includeMediatorRegistration,
+        string rootPath,
+        string controllerPrefix,
+        string controllerSuffix,
+        string controllerBase,
         params MetadataReference[] additionalReferences)
     {
         var compilation = CreateCompilation(
@@ -33,8 +73,15 @@ internal static class GeneratorTestHarness
                 ["build_property.UOMediatorControllerBase"] = controllerBase
             });
 
+        var generators = includeMediatorRegistration
+            ? new ISourceGenerator[]
+            {
+                new MediatorApiExplorerGenerator().AsSourceGenerator(),
+                new UOMediatorGenerator().AsSourceGenerator()
+            }
+            : [new MediatorApiExplorerGenerator().AsSourceGenerator()];
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new MediatorApiExplorerGenerator().AsSourceGenerator()],
+            generators: generators,
             additionalTexts: [],
             parseOptions: parseOptions,
             optionsProvider: optionsProvider);
@@ -109,6 +156,9 @@ internal static class GeneratorTestHarness
         var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
         var references = GetPlatformReferences()
             .Append(MetadataReference.CreateFromFile(typeof(IRequest).Assembly.Location))
+            .Append(MetadataReference.CreateFromFile(
+                typeof(UOMediatorServiceCollectionExtensions).Assembly.Location))
+            .Append(MetadataReference.CreateFromFile(typeof(IServiceCollection).Assembly.Location))
             .Concat(additionalReferences)
             .GroupBy(reference => reference.Display, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())

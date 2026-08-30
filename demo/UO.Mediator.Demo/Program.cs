@@ -1,13 +1,14 @@
 using Scalar.AspNetCore;
 using UO.Mediator;
 using UO.Mediator.Demo.Books;
+using UO.Mediator.Generated;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<BookStore>();
-builder.Services.AddUOMediator(typeof(Program).Assembly);
+builder.Services.AddDemoUOMediator();
 
 var app = builder.Build();
 

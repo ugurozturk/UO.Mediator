@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/UO.Mediator/UO.Mediator.csproj" />
+    <ProjectReference Include="../../src/UO.Mediator.Generators/UO.Mediator.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <!-- Reference the generator as an analyzer so it produces controllers in this assembly -->
     <ProjectReference Include="../../src/UO.Mediator.ApiExplorer/UO.Mediator.ApiExplorer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>

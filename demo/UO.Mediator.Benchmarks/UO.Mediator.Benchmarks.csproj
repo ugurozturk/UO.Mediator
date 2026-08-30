@@ -21,7 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/UO.Mediator.Generators/UO.Mediator.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../src/UO.Mediator/UO.Mediator.csproj" />
+    <ProjectReference Include="../UO.Mediator.Startup10/UO.Mediator.Startup10.csproj" />
+    <ProjectReference Include="../UO.Mediator.Startup100/UO.Mediator.Startup100.csproj" />
+    <ProjectReference Include="../UO.Mediator.Startup1000/UO.Mediator.Startup1000.csproj" />
   </ItemGroup>
 
 </Project>

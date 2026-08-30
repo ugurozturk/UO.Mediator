@@ -12,6 +12,10 @@ public class RequestGraphValidator(
 {
     private readonly RequestDispatcherOptions _options = options.Value;
     private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly RequestExecutorRegistry _executorRegistry =
+        serviceProvider.GetRequiredService<RequestExecutorRegistry>();
+    private readonly IGeneratedRequestDescriptor[] _generatedRequests =
+        serviceProvider.GetServices<IGeneratedRequestDescriptor>().ToArray();
 
     /// <summary>
     /// Performs static and DI-resolution validation across all discovered application types.
@@ -27,11 +31,27 @@ public class RequestGraphValidator(
         var errors = FindErrors(applicationTypes);
 
         using var scope = _serviceProvider.CreateScope();
-        foreach (var request in DescribeRequests(applicationTypes))
+        var requests = DescribeRequests(applicationTypes)
+            .Concat(_executorRegistry.GeneratedExecutors.Select(executor =>
+                new RequestDescriptor(
+                    executor.RequestType,
+                    executor.ResponseType,
+                    executor.ResponseType != typeof(void),
+                    executor.HandlerContract)))
+            .Concat(_generatedRequests.Select(request =>
+                new RequestDescriptor(
+                    request.RequestType,
+                    request.ResponseType,
+                    request.HasResponse,
+                    request.HandlerContract)))
+            .DistinctBy(request => (request.RequestType, request.ResponseType, request.HasResponse))
+            .ToArray();
+
+        foreach (var request in requests)
         {
-            var handlerContract = request.HasResponse
+            var handlerContract = request.HandlerContract ?? (request.HasResponse
                 ? typeof(IRequestHandler<,>).MakeGenericType(request.RequestType, request.ResponseType)
-                : typeof(IRequestHandler<>).MakeGenericType(request.RequestType);
+                : typeof(IRequestHandler<>).MakeGenericType(request.RequestType));
             try
             {
                 var resolvedHandlerTypes = scope.ServiceProvider
@@ -71,6 +91,7 @@ public class RequestGraphValidator(
     {
         var types = applicationTypes.ToArray();
         var handlers = types
+            .Where(type => !type.ContainsGenericParameters)
             .SelectMany(type => type.GetInterfaces()
                 .Where(interfaceType => IsHandlerContract(interfaceType) || IsNoResponseHandlerContract(interfaceType))
                 .Select(contract => new
@@ -114,7 +135,7 @@ public class RequestGraphValidator(
             {
                 if (typeof(IRequest).IsAssignableFrom(type))
                 {
-                    return [new RequestDescriptor(type, typeof(Unit), false)];
+                    return [new RequestDescriptor(type, typeof(Unit), false, null)];
                 }
 
                 return type.GetInterfaces()
@@ -122,7 +143,8 @@ public class RequestGraphValidator(
                     .Select(contract => new RequestDescriptor(
                         type,
                         contract.GenericTypeArguments[0],
-                        true));
+                        true,
+                        null));
             })
             .Distinct()
             .ToArray();
@@ -155,7 +177,11 @@ public class RequestGraphValidator(
         }
     }
 
-    private sealed record RequestDescriptor(Type RequestType, Type ResponseType, bool HasResponse);
+    private sealed record RequestDescriptor(
+        Type RequestType,
+        Type ResponseType,
+        bool HasResponse,
+        Type? HandlerContract);
 }
 
 public sealed class RequestGraphValidationException(string message) : InvalidOperationException(message);

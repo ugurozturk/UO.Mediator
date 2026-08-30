@@ -45,26 +45,26 @@ public sealed class BookStore
 // Requests with the same ControllerName become actions in one generated partial controller.
 
 [MediatorApiExplorer(ControllerName = "Book")]
-public sealed record GetListBooksRequest : IRequest<IReadOnlyList<Book>>;
+public sealed partial record GetListBooksRequest : IRequest<IReadOnlyList<Book>>;
 
 [MediatorApiExplorer(ControllerName = "Book")]
-public sealed record GetBookRequest(Guid Id) : IRequest<Book?>;
+public sealed partial record GetBookRequest(Guid Id) : IRequest<Book?>;
 
 // This metadata is copied to the generated CreateBookAsync action.
 [MediatorApiExplorer(ControllerName = "Book")]
 [DemoActionMetadata(
     "books.create",
     Description = "Copied from CreateBookRequest to CreateBookAsync.")]
-public sealed record CreateBookRequest(string Title, string Author) : IRequest<Book>;
+public sealed partial record CreateBookRequest(string Title, string Author) : IRequest<Book>;
 
 [MediatorApiExplorer(ControllerName = "Book")]
-public sealed record UpdateBookCommand(Guid Id, string Title, string Author) : IRequest<Book?>;
+public sealed partial record UpdateBookCommand(Guid Id, string Title, string Author) : IRequest<Book?>;
 
 [MediatorApiExplorer(ControllerName = "Book")]
-public sealed record DeleteBookRequest(Guid Id) : IRequest;
+public sealed partial record DeleteBookRequest(Guid Id) : IRequest;
 
 [MediatorApiExplorer(
     ControllerName = "Book",
     Route = "/api/app/books/clear",
     HttpMethod = MediatorHttpMethod.Post)]
-public sealed record ClearBooksCommand : IRequest;
+public sealed partial record ClearBooksCommand : IRequest;

@@ -2,7 +2,7 @@ using UO.Mediator.Dispatching;
 
 namespace UO.Mediator.Benchmarks.Cases;
 
-public sealed record UOPingRequest(int Value) : IRequest<int>;
+public sealed partial record UOPingRequest(int Value) : IRequest<int>;
 
 public sealed class UOPingRequestHandler : IRequestHandler<UOPingRequest, int>
 {

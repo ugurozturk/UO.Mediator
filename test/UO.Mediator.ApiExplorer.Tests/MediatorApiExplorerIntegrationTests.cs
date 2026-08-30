@@ -23,7 +23,7 @@ public class MediatorApiExplorerIntegrationTests
             namespace IntegrationContracts;
 
             [MediatorApiExplorer(ControllerName = "Catalog")]
-            public sealed record GetGreetingRequest(string Name) : IRequest<string>;
+            public sealed partial record GetGreetingRequest(string Name) : IRequest<string>;
 
             public sealed class GetGreetingHandler
                 : IRequestHandler<GetGreetingRequest, string>
@@ -35,7 +35,7 @@ public class MediatorApiExplorerIntegrationTests
             }
 
             [MediatorApiExplorer(ControllerName = "Catalog")]
-            public sealed record RebuildCatalogCommand : IRequest;
+            public sealed partial record RebuildCatalogCommand : IRequest;
 
             public sealed class RebuildCatalogHandler
                 : IRequestHandler<RebuildCatalogCommand>
@@ -47,13 +47,23 @@ public class MediatorApiExplorerIntegrationTests
             }
             """;
 
-        var execution = GeneratorTestHarness.Run(source);
+        var execution = GeneratorTestHarness.RunWithMediatorRegistration(source);
         GeneratorTestHarness.AssertNoCompilationErrors(execution);
-        Assert.Single(
-            execution.RunResult.Results.SelectMany(result => result.GeneratedSources));
+        var generatedSource = GeneratorTestHarness.GetGeneratedSource(execution);
+        Assert.Equal(
+            3,
+            execution.RunResult.Results.SelectMany(result => result.GeneratedSources).Count());
         Assert.Contains(
             "public partial class CatalogController",
-            GeneratorTestHarness.GetGeneratedSource(execution),
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "AddGeneratedRoutedRequest<",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "IGeneratedRequestRoute<string>",
+            generatedSource,
             StringComparison.Ordinal);
         var generatedAssembly = GeneratorTestHarness.EmitAndLoad(execution);
 
@@ -62,7 +72,7 @@ public class MediatorApiExplorerIntegrationTests
         builder.Services
             .AddControllers()
             .AddApplicationPart(generatedAssembly);
-        builder.Services.AddUOMediator(generatedAssembly);
+        InvokeGeneratedRegistration(generatedAssembly, builder.Services);
 
         await using var app = builder.Build();
         app.MapControllers();
@@ -96,5 +106,19 @@ public class MediatorApiExplorerIntegrationTests
             description =>
                 description.HttpMethod == "POST" &&
                 description.RelativePath == "api/app/rebuild-catalog");
+    }
+
+    private static void InvokeGeneratedRegistration(
+        System.Reflection.Assembly generatedAssembly,
+        IServiceCollection services)
+    {
+        var registrationType = Assert.Single(generatedAssembly.GetTypes(), type =>
+            type.Namespace == "UO.Mediator.Generated" &&
+            type.Name.EndsWith("UOMediatorRegistration", StringComparison.Ordinal));
+        var registrationMethod = Assert.Single(registrationType.GetMethods(), method =>
+            method.Name.StartsWith("Add", StringComparison.Ordinal) &&
+            method.Name.EndsWith("UOMediator", StringComparison.Ordinal));
+
+        registrationMethod.Invoke(null, [services, null]);
     }
 }

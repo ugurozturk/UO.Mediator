@@ -23,6 +23,87 @@ public class RequestDispatcherTests
     }
 
     [Fact]
+    public async Task Should_Dispatch_Strongly_Typed_Generated_Registrations_Without_Assembly_Scanning()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddUOMediatorCore();
+        services.AddGeneratedRequest<GeneratedEchoRequest, string, GeneratedEchoHandler>();
+        services.AddGeneratedRequest<GeneratedCommand, GeneratedCommandHandler>();
+        services.AddGeneratedBehavior<
+            GeneratedEchoRequest,
+            string,
+            GeneratedEchoBehavior>();
+
+        var loggingBehavior = services.Single(descriptor =>
+            descriptor.ServiceType == typeof(IRequestBehavior<,>) &&
+            descriptor.ImplementationType == typeof(RequestLoggingBehavior<,>));
+        services.Remove(loggingBehavior);
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        provider.ValidateUOMediator();
+        var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
+        var trace = new List<string>();
+        var command = new GeneratedCommand();
+        var genericCommand = new GeneratedCommand();
+
+        var response = await dispatcher.DispatchAsync(new GeneratedEchoRequest("typed", trace));
+        await dispatcher.DispatchAsync(command);
+        var unit = await dispatcher.DispatchAsync<Unit>(genericCommand);
+
+        Assert.Equal("TYPED", response);
+        Assert.Equal(["behavior", "handler"], trace);
+        Assert.True(command.WasHandled);
+        Assert.True(genericCommand.WasHandled);
+        Assert.Equal(Unit.Value, unit);
+    }
+
+    [Fact]
+    public void Generated_Registration_Validation_Should_Detect_Cross_Module_Duplicate_Handlers()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddUOMediatorCore();
+        services.AddGeneratedRequest<
+            GeneratedEchoRequest,
+            string,
+            GeneratedEchoHandler>();
+        services.AddGeneratedRequest<
+            GeneratedEchoRequest,
+            string,
+            DuplicateGeneratedEchoHandler<object>>();
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+
+        var exception = Assert.Throws<RequestGraphValidationException>(
+            provider.ValidateUOMediator);
+
+        Assert.Contains("DI resolved 2 handlers", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Generated_Dispatcher_Should_Not_Fall_Back_To_Runtime_Executor_Creation()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddUOMediatorCore();
+        services.AddTransient<
+            IRequestHandler<GeneratedCommand>,
+            GeneratedCommandHandler>();
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => dispatcher.DispatchAsync(new GeneratedCommand()));
+
+        Assert.Contains(
+            "No source-generated executor is registered",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Should_Execute_No_Response_Handler_Exactly_Once_Without_Behaviors()
     {
         using var provider = BuildProviderWithoutLoggingBehavior();
@@ -267,6 +348,50 @@ public class RequestDispatcherTests
 }
 
 public sealed record EchoRequest(string Value) : IRequest<string>;
+
+public sealed record GeneratedEchoRequest(string Value, List<string> Trace) : IRequest<string>;
+
+public sealed class GeneratedEchoHandler : IRequestHandler<GeneratedEchoRequest, string>
+{
+    public Task<string> HandleAsync(GeneratedEchoRequest request)
+    {
+        request.Trace.Add("handler");
+        return Task.FromResult(request.Value.ToUpperInvariant());
+    }
+}
+
+public sealed class DuplicateGeneratedEchoHandler<TMarker> : IRequestHandler<GeneratedEchoRequest, string>
+{
+    public Task<string> HandleAsync(GeneratedEchoRequest request)
+    {
+        return Task.FromResult(request.Value);
+    }
+}
+
+public sealed class GeneratedEchoBehavior : IRequestBehavior<GeneratedEchoRequest, string>
+{
+    public Task<string> HandleAsync(
+        GeneratedEchoRequest request,
+        RequestHandlerNext<GeneratedEchoRequest, string> next)
+    {
+        request.Trace.Add("behavior");
+        return next.InvokeAsync();
+    }
+}
+
+public sealed class GeneratedCommand : IRequest
+{
+    public bool WasHandled { get; set; }
+}
+
+public sealed class GeneratedCommandHandler : IRequestHandler<GeneratedCommand>
+{
+    public Task HandleAsync(GeneratedCommand request)
+    {
+        request.WasHandled = true;
+        return Task.CompletedTask;
+    }
+}
 
 public sealed class EchoRequestHandler : IRequestHandler<EchoRequest, string>
 {

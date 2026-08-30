@@ -3,13 +3,24 @@
     <Project Path="src/UO.Mediator.Shared/UO.Mediator.Shared.csproj" />
     <Project Path="src/UO.Mediator/UO.Mediator.csproj" />
     <Project Path="src/UO.Mediator.ApiExplorer/UO.Mediator.ApiExplorer.csproj" />
+    <Project Path="src/UO.Mediator.Generators/UO.Mediator.Generators.csproj" />
   </Folder>
   <Folder Name="/demo/">
     <Project Path="demo/UO.Mediator.Benchmarks/UO.Mediator.Benchmarks.csproj" />
     <Project Path="demo/UO.Mediator.Demo/UO.Mediator.Demo.csproj" />
+    <Project Path="demo/UO.Mediator.MultiAssembly.Contracts/UO.Mediator.MultiAssembly.Contracts.csproj" />
+    <Project Path="demo/UO.Mediator.MultiAssembly.HandlersA/UO.Mediator.MultiAssembly.HandlersA.csproj" />
+    <Project Path="demo/UO.Mediator.MultiAssembly.HandlersB/UO.Mediator.MultiAssembly.HandlersB.csproj" />
+    <Project Path="demo/UO.Mediator.MultiAssemblySample/UO.Mediator.MultiAssemblySample.csproj" />
+    <Project Path="demo/UO.Mediator.NativeAotSample/UO.Mediator.NativeAotSample.csproj" />
+    <Project Path="demo/UO.Mediator.Startup10/UO.Mediator.Startup10.csproj" />
+    <Project Path="demo/UO.Mediator.Startup100/UO.Mediator.Startup100.csproj" />
+    <Project Path="demo/UO.Mediator.Startup1000/UO.Mediator.Startup1000.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/UO.Mediator.Tests/UO.Mediator.Tests.csproj" />
     <Project Path="test/UO.Mediator.ApiExplorer.Tests/UO.Mediator.ApiExplorer.Tests.csproj" />
+    <Project Path="test/UO.Mediator.Generators.IntegrationTests/UO.Mediator.Generators.IntegrationTests.csproj" />
+    <Project Path="test/UO.Mediator.Generators.Tests/UO.Mediator.Generators.Tests.csproj" />
   </Folder>
 </Solution>

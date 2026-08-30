@@ -4,12 +4,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace UO.Mediator.Dispatching;
 
 /// <summary>
-/// Default implementation of <see cref="IRequestDispatcher"/>.
-/// Caches closed-generic executors globally and prepared behaviour pipelines per service provider.
+/// Reflection-compatible implementation of <see cref="IRequestDispatcher"/>.
+/// Caches closed-generic executors globally.
+/// Prepared behaviour pipelines remain cached per service provider.
 /// </summary>
 public class RequestDispatcher(IServiceProvider serviceProvider) : IRequestDispatcher
 {
-    private static readonly ConcurrentDictionary<(Type Request, Type Response), IRequestExecutor> Executors = new();
+    private static readonly ConcurrentDictionary<(Type Request, Type Response), IRequestExecutor>
+        Executors = new();
     private readonly IServiceProvider _serviceProvider = serviceProvider;
     private readonly RequestPipelineCache _pipelineCache =
         serviceProvider.GetService<RequestPipelineCache>() ?? new RequestPipelineCache();
@@ -59,68 +61,5 @@ public class RequestDispatcher(IServiceProvider serviceProvider) : IRequestDispa
     {
         var executorType = typeof(NoResponseRequestExecutor<>).MakeGenericType(requestType);
         return (IRequestExecutor)Activator.CreateInstance(executorType)!;
-    }
-
-    private interface IRequestExecutor
-    {
-    }
-
-    private interface IRequestExecutor<TResponse> : IRequestExecutor
-    {
-        Task<TResponse> ExecuteAsync(
-            IRequest<TResponse> request,
-            IServiceProvider serviceProvider,
-            RequestPipelineCache pipelineCache);
-    }
-
-    private interface INoResponseRequestExecutor : IRequestExecutor
-    {
-        Task ExecuteAsync(
-            IRequest request,
-            IServiceProvider serviceProvider,
-            RequestPipelineCache pipelineCache);
-    }
-
-    private sealed class NoResponseRequestExecutor<TRequest> : INoResponseRequestExecutor
-        where TRequest : IRequest
-    {
-        public Task ExecuteAsync(
-            IRequest request,
-            IServiceProvider serviceProvider,
-            RequestPipelineCache pipelineCache)
-        {
-            var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest>>();
-            var behaviors = ResolveBehaviors<IRequestBehavior<TRequest, Unit>>(serviceProvider);
-
-            if (behaviors.Count == 0)
-            {
-                return handler.HandleAsync((TRequest)request);
-            }
-
-            var pipeline = pipelineCache.GetOrAddNoResponse<TRequest>(behaviors);
-            return pipeline.ExecuteAsync((TRequest)request, handler, behaviors);
-        }
-    }
-
-    private sealed class RequestExecutor<TRequest, TResponse> : IRequestExecutor<TResponse>
-        where TRequest : IRequest<TResponse>
-    {
-        public Task<TResponse> ExecuteAsync(
-            IRequest<TResponse> request,
-            IServiceProvider serviceProvider,
-            RequestPipelineCache pipelineCache)
-        {
-            var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
-            var behaviors = ResolveBehaviors<IRequestBehavior<TRequest, TResponse>>(serviceProvider);
-            var pipeline = pipelineCache.GetOrAdd<TRequest, TResponse>(behaviors);
-
-            return pipeline.ExecuteAsync((TRequest)request, handler, behaviors);
-        }
-    }
-
-    private static IReadOnlyList<TBehavior> ResolveBehaviors<TBehavior>(IServiceProvider serviceProvider)
-    {
-        var behaviors = serviceProvider.GetServices<TBehavior>();
-        return behaviors as IReadOnlyList<TBehavior> ?? behaviors.ToArray();
     }
 }

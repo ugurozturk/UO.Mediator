@@ -16,10 +16,13 @@ mediator resolution, source generation, and first-call cache initialization.
 > `Task`. This difference can affect the benchmark results and should be taken
 > into account when comparing the libraries.
 
-UO.Mediator is shown twice. `default logging` measures its public default, which
-always includes `RequestLoggingBehavior`. `core dispatch` removes that descriptor
-inside the benchmark setup to isolate dispatcher overhead; this is not currently
-a supported UO.Mediator configuration API.
+UO.Mediator is shown four ways. `default logging` measures its reflection-compatible
+public default, which always includes `RequestLoggingBehavior`. `core dispatch` removes that
+descriptor inside the benchmark setup to isolate the compatibility dispatcher overhead.
+`generated registry` uses the first source-generation prototype's runtime executor dictionary.
+`generated routes` uses a compile-time emitted O(1) self-route on the partial request type and
+bypasses runtime request type and executor dictionary lookup. Both generated cases remove the
+same default logging behavior.
 
 Additional UO.Mediator benchmark groups isolate specific dispatcher costs:
 
@@ -28,6 +31,23 @@ Additional UO.Mediator benchmark groups isolate specific dispatcher costs:
   synchronously completed tasks and handlers that call `Task.Yield()`.
 - `UOHandlerLookupBenchmarks` measures a warmed dispatch after preparing `10`, `100`,
   or `1000` distinct closed request/handler pipelines.
+- `UOStartupRegistrationBenchmarks` compares reflection and source-generated service
+  registration plus `ServiceProvider` construction for `10`, `100`, and `1000` handlers.
+- `UOStartupDispatchBenchmarks` isolates first-use dispatch and warmed dispatch for the
+  last request in each `10`, `100`, and `1000` handler fixture assembly.
+
+For `first dispatch`, provider construction and dispatcher resolution happen in iteration
+setup and are excluded from the measured operation. The runtime executor cache is cleared
+before every measured runtime invocation, so the runtime result includes its real
+`MakeGenericType`/`Activator.CreateInstance` first-use work. Each first-use iteration invokes
+the dispatcher once; use the median alongside the mean because short jobs have only three
+samples and BenchmarkDotNet correctly reports a minimum-iteration-time warning.
+
+The registration benchmark measures the public default composition. Generated registration
+therefore includes one closed NativeAOT-safe logging behavior registration per request;
+the reflection path initially adds one open-generic logging registration. Both logging
+descriptors are removed before provider construction and dispatch so warmed hot-path numbers
+remain comparable.
 
 All UO.Mediator benchmarks warm the executor and pipeline caches during global setup.
 Each behavior and handler count is a separate benchmark method so BenchmarkDotNet
@@ -111,3 +131,6 @@ dotnet run -c Release --project demo/UO.Mediator.Benchmarks -- \
 BenchmarkDotNet writes detailed Markdown, CSV, and HTML reports under
 `BenchmarkDotNet.Artifacts/`. Run benchmarks on an idle machine in Release mode;
 do not compare numbers collected on different machines or runtime versions.
+
+The accepted results and decision are summarized in
+[`docs/source-generated-dispatch-evaluation.md`](../../docs/source-generated-dispatch-evaluation.md).

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using System.ComponentModel;
 
 [assembly: InternalsVisibleTo("UO.Mediator")]
 
@@ -30,6 +31,49 @@ public interface IRequest : IRequest<Unit>
 /// <typeparam name="TResponse">The response type.</typeparam>
 public interface IRequest<out TResponse>
 {
+}
+
+/// <summary>
+/// Runtime execution context used by source-generated request routes.
+/// </summary>
+[EditorBrowsable(EditorBrowsableState.Never)]
+public interface IGeneratedDispatchContext
+{
+    /// <summary>
+    /// Executes a strongly typed no-response request.
+    /// </summary>
+    Task DispatchAsync<TRequest>(TRequest request)
+        where TRequest : IRequest;
+
+    /// <summary>
+    /// Executes a strongly typed response request.
+    /// </summary>
+    Task<TResponse> DispatchAsync<TRequest, TResponse>(TRequest request)
+        where TRequest : IRequest<TResponse>;
+}
+
+/// <summary>
+/// O(1) no-response dispatch route implemented on partial request types by the source generator.
+/// </summary>
+[EditorBrowsable(EditorBrowsableState.Never)]
+public interface IGeneratedRequestRoute
+{
+    /// <summary>
+    /// Dispatches this request through its generated strongly typed route.
+    /// </summary>
+    Task DispatchAsync(IGeneratedDispatchContext context);
+}
+
+/// <summary>
+/// O(1) response dispatch route implemented on partial request types by the source generator.
+/// </summary>
+[EditorBrowsable(EditorBrowsableState.Never)]
+public interface IGeneratedRequestRoute<TResponse>
+{
+    /// <summary>
+    /// Dispatches this request through its generated strongly typed route.
+    /// </summary>
+    Task<TResponse> DispatchAsync(IGeneratedDispatchContext context);
 }
 
 /// <summary>
@@ -173,7 +217,9 @@ public interface IRequestDispatcher
 public class RequestDispatcherOptions
 {
     /// <summary>
-    /// Assemblies scanned for request handlers, behaviours and startup validation.
+    /// Assemblies scanned by the reflection-compatible registration path for request
+    /// handlers, behaviours and startup validation. Source-generated registration does not
+    /// populate this collection.
     /// </summary>
     public IList<Assembly> Assemblies { get; } = [];
 
