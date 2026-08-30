@@ -8,7 +8,7 @@ The library is not intended to replace ABP application services, authorization, 
 
 - [Packages](#packages)
 - [Quick start](#quick-start)
-- [Recommended layout for an ABP application](#recommended-layout-for-an-abp-application)
+- [Recommended layout for UO.Mediator in a layered ABP application](#recommended-layout-for-uomediator-in-a-layered-abp-application)
 - [ABP integration](#abp-integration)
 - [Provider-specific EF Core queries in ABP](#provider-specific-ef-core-queries-in-abp)
 - [Pipeline behaviors](#pipeline-behaviors)
@@ -90,47 +90,73 @@ public sealed class RebuildOrderIndexHandler : IRequestHandler<RebuildOrderIndex
 }
 ```
 
-## Recommended layout for an ABP application
+## Recommended layout for UO.Mediator in a layered ABP application
 
-The following responsibility split is recommended for a standard layered ABP solution:
+The following layout is the recommended way to use UO.Mediator in a standard layered ABP solution.
 
-| ABP project | What belongs here? | What should not be placed here? |
-| --- | --- | --- |
-| `*.Domain.Shared` | Enums, constants, and values that genuinely need to be shared across the domain | Handlers, dispatcher registration, or repository-based request workflows |
-| `*.Domain` | Entities, aggregates, domain services/managers, and business rules | HTTP/UI-specific code or application orchestration |
-| `*.Application.Contracts` | Public AppService DTOs and interfaces; public mediator request contracts when they must be shared across modules | Handler implementations or repository access |
-| `*.Application` | Requests/commands/queries, handlers, application-specific behaviors, and AppService facades | Host startup code or HTTP controller details |
-| `*.EntityFrameworkCore` | Repository and EF Core implementations | Request/handler orchestration |
-| `*.HttpApi` | Manually written controllers and HTTP-specific models | Domain rules and handler implementations |
-| `*.HttpApi.Host` | `AddUOMediator` registration, the assembly list, and the optional ApiExplorer package | Business rules or repository-based handlers |
+These are **UO.Mediator integration recommendations**, not requirements imposed by the ABP Framework.
 
-Example layout:
+| ABP project | Recommended responsibility |
+| --- | --- |
+| `*.Domain.Shared` | Shared domain enums, constants, localization resources, and other domain-level shared contracts. UO.Mediator requests and handlers do not belong here. |
+| `*.Domain` | Entities, aggregates, value objects, domain services/managers, repository abstractions, and domain business rules. Application request handlers do not belong here. |
+| `*.Application.Contracts` | Public AppService interfaces and DTOs. Mediator request contracts may be placed here only when another application module intentionally needs to dispatch them directly. |
+| `*.Application` | The primary home for UO.Mediator requests, commands, queries, handlers, and application-specific behaviors. Application orchestration belongs here. |
+| `*.EntityFrameworkCore` | `DbContext`, EF Core mappings, repository implementations, and provider-specific persistence/query implementations. Application mediator handlers do not belong here. |
+| `*.HttpApi` | Manually implemented HTTP controllers and HTTP-specific contracts when needed. |
+| `*.HttpApi.Host` | The executable composition root. It references the `UO.Mediator` runtime, calls `AddUOMediator` with the handler assemblies, and optionally references `UO.Mediator.ApiExplorer`. |
+
+### Typical dependency placement
+
+The Application layer owns the mediator workflows and references `UO.Mediator.Shared`. The executable host references the `UO.Mediator` runtime and registers the handler assemblies:
 
 ```text
-Acme.BookStore.Domain/
-└── Books/
-    ├── Book.cs
-    └── BookManager.cs
-
-Acme.BookStore.Application.Contracts/
-└── Books/
-    ├── BookDto.cs
-    ├── CreateBookDto.cs
-    └── IBookAppService.cs
-
-Acme.BookStore.Application/
-└── Books/
-    ├── BookAppService.cs
-    ├── CreateBookCommand.cs
-    ├── CreateBookCommandHandler.cs
-    └── Behaviors/
-        └── CreateBookValidationBehavior.cs
-
-Acme.BookStore.HttpApi.Host/
-└── BookStoreHttpApiHostModule.cs
+Application.Contracts -> UO.Mediator.Shared  (only when requests are intentionally shared)
+Application           -> UO.Mediator.Shared
+HttpApi.Host           -> UO.Mediator
+HttpApi.Host           -> UO.Mediator.ApiExplorer  (optional)
 ```
 
-If a request is used only inside the same Application assembly, keep it in the Application project. If other modules or applications need to dispatch it directly, move the contract to `Application.Contracts` and reference `UO.Mediator.Shared` from that project.
+Application workflows are normally organized in the Application project:
+
+```text
+*.Application
+    ├── Requests
+    ├── Commands
+    ├── Queries
+    ├── Handlers
+    └── Behaviors
+```
+
+The HTTP API host may opt into compile-time API generation:
+
+```xml
+<PackageReference Include="UO.Mediator.ApiExplorer" Version="2.4.2" />
+```
+
+`UO.Mediator.ApiExplorer` is a compile-time source-generator/analyzer package. It does not introduce a runtime dependency merely to execute the generator.
+
+The resulting responsibility flow is typically:
+
+```text
+HTTP API Host
+      │
+      │ generated API surface / ApiExplorer metadata (optional)
+      ▼
+Application Request
+      │
+      ▼
+Application Handler
+      │
+      ├── Domain services
+      ├── Repository abstractions
+      └── Persistence/query abstractions
+                 │
+                 ▼
+          EntityFrameworkCore
+```
+
+UO.Mediator is intended to model and dispatch **application use cases**. EF Core-specific persistence implementations remain infrastructure concerns and should not become mediator handlers merely to avoid direct dependencies.
 
 Not every DTO needs to become a mediator request. The HTTP/API contract can remain an AppService DTO while the AppService maps that DTO to an internal command or query.
 
